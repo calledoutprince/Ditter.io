@@ -20,4 +20,5 @@ The React Compiler is not enabled on this template because of its impact on dev 
 # Ditter.io
 
 A tool I'm building for fun, let's see what happens after our first push
+
 224950fd6f3629ffefc2b98b288330480a446897
