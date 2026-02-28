@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 // Atkinson Dithering matrix processing
-const applyAtkinsonDither = (imageData, threshold) => {
+export const applyAtkinsonDither = (imageData, threshold) => {
     const data = imageData.data;
     const width = imageData.width;
     
@@ -49,7 +49,7 @@ const applyAtkinsonDither = (imageData, threshold) => {
 };
 
 // Replace black and white with Brand HEX colors
-const applyColorMap = (imageData, accentColor, bgColor) => {
+export const applyColorMap = (imageData, accentColor, bgColor) => {
     const data = imageData.data;
     
     // Parse hex

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Matter from 'matter-js';
 
-export function usePhysics() {
+export function usePhysics(cameraRef) {
   const engineRef = useRef(null);
   const renderRef = useRef(null);
   const runnerRef = useRef(null);
@@ -20,20 +20,21 @@ export function usePhysics() {
     runnerRef.current = runner;
     Matter.Runner.run(runner, engine);
 
-    // Initial boundaries
+    // Initial massive boundaries for "infinite" canvas
     const updateBoundaries = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      
       const wallOptions = { 
         isStatic: true,
         render: { visible: false }
       };
 
-      const ground = Matter.Bodies.rectangle(width / 2, height + 50, width, 100, wallOptions);
-      const ceiling = Matter.Bodies.rectangle(width / 2, -50, width, 100, wallOptions);
-      const leftWall = Matter.Bodies.rectangle(-50, height / 2, 100, height, wallOptions);
-      const rightWall = Matter.Bodies.rectangle(width + 50, height / 2, 100, height, wallOptions);
+      // Create a 10000 x 10000 world
+      const size = 10000;
+      const thick = 500;
+
+      const ground = Matter.Bodies.rectangle(0, size/2, size, thick, wallOptions);
+      const ceiling = Matter.Bodies.rectangle(0, -size/2, size, thick, wallOptions);
+      const leftWall = Matter.Bodies.rectangle(-size/2, 0, thick, size, wallOptions);
+      const rightWall = Matter.Bodies.rectangle(size/2, 0, thick, size, wallOptions);
 
       // Clear old boundaries, add new
       const currentBodies = Matter.Composite.allBodies(engine.world);
@@ -43,38 +44,11 @@ export function usePhysics() {
     };
 
     updateBoundaries();
-    window.addEventListener('resize', updateBoundaries);
 
-    // Cursor Repulsion logic
-    const handleMouseMove = (e) => {
-        const mousePosition = { x: e.clientX, y: e.clientY };
-        const bodies = Matter.Composite.allBodies(engine.world).filter(b => !b.isStatic);
-        
-        bodies.forEach(body => {
-            const distanceX = body.position.x - mousePosition.x;
-            const distanceY = body.position.y - mousePosition.y;
-            const distanceSq = distanceX * distanceX + distanceY * distanceY;
-            
-            // Interaction radius squared
-            if (distanceSq < 40000) { 
-                const forceMagnitude = 0.05 * (1 - distanceSq / 40000); // Inverse relation
-                const angle = Math.atan2(distanceY, distanceX);
-                
-                Matter.Body.applyForce(body, body.position, {
-                    x: Math.cos(angle) * forceMagnitude,
-                    y: Math.sin(angle) * forceMagnitude
-                });
-            }
-        });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
 
     return () => {
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
-      window.removeEventListener('resize', updateBoundaries);
-      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
 
@@ -83,11 +57,10 @@ export function usePhysics() {
        const body = Matter.Bodies.rectangle(x, y, width, height, {
            restitution: 0.9, // Bounciness
            friction: 0.1,
-           frictionAir: 0.05, // Slight drag so they don't float forever infinitely fast
+           frictionAir: 0.05, // Slight drag
        });
        Matter.Composite.add(engineRef.current.world, body);
        
-       // Give it an initial random nudge
        Matter.Body.applyForce(body, body.position, {
            x: (Math.random() - 0.5) * 0.05,
            y: (Math.random() - 0.5) * 0.05

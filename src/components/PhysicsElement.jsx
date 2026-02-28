@@ -67,10 +67,11 @@ const PhysicsElement = ({ engine, x, y, children }) => {
             ref={elementRef}
             style={{ 
                 position: 'absolute',
-                left: position.x,
-                top: position.y,
+                left: Math.round(position.x),
+                top: Math.round(position.y),
                 transform: `translate(-50%, -50%) rotate(${position.angle}rad)`,
-                pointerEvents: 'none', // Let mouse events pass through to canvas
+                pointerEvents: 'auto', // Allow clicks and focus on elements
+                userSelect: 'none',   // Prevent text selection while dragging
                 willChange: 'transform' // GPU optimization
             }}
         >
