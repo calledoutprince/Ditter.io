@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Download, Copy, Check, Sun, Type, Image as ImageIcon, Code } from 'lucide-react';
+// eslint-disable-next-line no-unused-vars
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePhysics } from './utils/usePhysics';
 import PhysicsElement from './components/PhysicsElement';
 import EffectEngine from './components/EffectEngine';
 import { vectorizeToSVG, downloadSVG } from './utils/vectorizer';
 import { constructFigmaPayload, copyHTMLToClipboard, constructFramerComponent } from './utils/integrations';
+import Dropdown from './components/Dropdown';
 import './index.css';
 
 const MIN_ZOOM = 0.1;
@@ -21,6 +24,8 @@ function App() {
   const [originalImageUrl, setOriginalImageUrl] = useState(null);
   const [activeProcessedUrl, setActiveProcessedUrl] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState('svg');
+  const [exportScale, setExportScale] = useState(1);
 
   // ── Micro-interaction states ──────────────────────────────
   const [panelsHidden, setPanelsHidden] = useState(false);
@@ -30,8 +35,6 @@ function App() {
   const [swatch1Wiggle, setSwatch1Wiggle] = useState(false);
   const [swatch2Wiggle, setSwatch2Wiggle] = useState(false);
   const [canvasFlash, setCanvasFlash] = useState(false);
-  const [svgNudge, setSvgNudge] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const logoRef = useRef(null);
   // ─────────────────────────────────────────────────────────
 
@@ -45,7 +48,7 @@ function App() {
   }, [camera]);
 
   const fileInputRef = useRef(null);
-  const { engine } = usePhysics(cameraRef);
+  const { engine } = usePhysics();
   const canvasRef = useRef(null);
 
   const isSpaceDown = useRef(false);
@@ -65,9 +68,9 @@ function App() {
   useEffect(() => {
     if (camera.z === prevZoomRef.current) return;
     prevZoomRef.current = camera.z;
-    setZoomSpring(true);
-    const t = setTimeout(() => setZoomSpring(false), 250);
-    return () => clearTimeout(t);
+    const t1 = setTimeout(() => setZoomSpring(true), 0);
+    const t2 = setTimeout(() => setZoomSpring(false), 250);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [camera.z]);
 
   // Dynamically update background color
@@ -101,7 +104,10 @@ function App() {
 
     const handleKeyDown = (e) => {
       // Space pan
-      if (e.code === 'Space') isSpaceDown.current = true;
+      if (e.code === 'Space') {
+        isSpaceDown.current = true;
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
+      }
 
       // Tab = toggle UI panels
       if (e.code === 'Tab') {
@@ -122,7 +128,10 @@ function App() {
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === 'Space') isSpaceDown.current = false;
+      if (e.code === 'Space') {
+        isSpaceDown.current = false;
+        if (canvasRef.current && !isDragging.current) canvasRef.current.style.cursor = 'default';
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -165,13 +174,11 @@ function App() {
     if (file) {
       const url = URL.createObjectURL(file);
       setOriginalImageUrl(url);
-      setIsProcessing(true);
     }
   };
 
   const handleProcessedImage = useCallback((dataUrl) => {
     setActiveProcessedUrl(dataUrl);
-    setIsProcessing(false);
 
     setItems((prev) => {
       const exists = prev.find(p => p.sourceUrl === originalImageUrl);
@@ -202,13 +209,6 @@ function App() {
     setTimeout(() => setCanvasFlash(false), 550);
   };
 
-  /** Add + remove a CSS class for a short duration */
-  const flashButtonClass = (btnRef, cls = 'flashing', ms = 400) => {
-    if (!btnRef.current) return;
-    btnRef.current.classList.add(cls);
-    setTimeout(() => btnRef.current?.classList.remove(cls), ms);
-  };
-
   // ─────────────────────────────────────────────────────────
 
   const _handleExportFigma = async () => {
@@ -231,8 +231,6 @@ function App() {
   const _handleExportSVG = async () => {
     if (!activeProcessedUrl) return;
     setIsExporting(true);
-    setSvgNudge(true);
-    setTimeout(() => setSvgNudge(false), 450);
     try {
       const { svgString } = await vectorizeToSVG(activeProcessedUrl, accentColor);
       downloadSVG(svgString, `dither-gravity-${Date.now()}.svg`);
@@ -272,13 +270,12 @@ function App() {
     setTimeout(() => setSwatch2Wiggle(false), 400);
   };
 
-  // Grid layer only strictly visible at high zoom
-  const gridOpacity = camera.z >= 8 ? 1 : 0;
-  const gridBackground = `linear-gradient(to right, rgba(0,0,0,0.1) 1px, transparent 1px),
-     linear-gradient(to bottom, rgba(0,0,0,0.1) 1px, transparent 1px)`;
+  // Persistent Dot Grid Layer
+  const gridBackground = `radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)`;
+  const gridSize = 24 * camera.z;
 
   return (
-    <div className="app-container" style={{ overflow: 'hidden' }}>
+    <div className="app-container">
       {originalImageUrl && (
         <EffectEngine
           src={originalImageUrl}
@@ -286,172 +283,18 @@ function App() {
           pixelScale={pixelScale}
           contrast={contrast}
           accentColor={accentColor}
-          bgColor={bgColor}
           onProcessed={handleProcessedImage}
         />
       )}
 
-      {/* Top Navigation Bar */}
-      <header className="topbar">
-        <div className="topbar-left">
-          <span className="logo-text">Ditter.io</span>
-        </div>
-        <div className="topbar-right">
-          <input
-            type="file"
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-            onChange={handleFileUpload}
-            accept="image/*"
-          />
-          <button
-            className="framer-button outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isExporting}
-          >
-            <Upload size={14} /> Upload Image
-          </button>
-          
-          <button
-            className={`framer-button outline${svgNudge ? ' nudging' : ''}`}
-            onClick={_handleExportSVG}
-            disabled={isExporting || !activeProcessedUrl}
-            title={!activeProcessedUrl ? 'Upload an image first' : 'Export SVG'}
-          >
-            <Download size={14} /> Export SVG
-          </button>
-
-          <button
-            className={`framer-button primary${figmaCopied ? ' success' : ''}`}
-            onClick={_handleExportFigma}
-            disabled={isExporting || !activeProcessedUrl}
-            title={!activeProcessedUrl ? 'Upload an image first' : 'Copy to Figma'}
-          >
-            {figmaCopied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Figma</>}
-          </button>
-
-          <button
-            className={`framer-button primary${framerCopied ? ' success' : ''}`}
-            onClick={_handleExportFramer}
-            disabled={isExporting || !activeProcessedUrl}
-            title={!activeProcessedUrl ? 'Upload an image first' : 'Copy Framer Component'}
-          >
-            {framerCopied ? <><Check size={14} /> Copied</> : <><Code size={14} /> Framer</>}
-          </button>
-        </div>
-      </header>
-
-      {/* Workspace Area */}
-      <div className="workspace">
-        {/* Properties Sidebar */}
-        <aside className="sidebar">
-        <div className="sidebar-section">
-          <div className="control-group">
-            <label className="control-label">Effect Render</label>
-            <div className="segmented-control">
-              <button
-                className={`segmented-btn ${effectType === 'atkinson' ? 'active' : ''}`}
-                onClick={() => setEffectType('atkinson')}
-              >
-                1-Bit
-              </button>
-              <button
-                className={`segmented-btn ${effectType === 'halftone' ? 'active' : ''}`}
-                onClick={() => setEffectType('halftone')}
-              >
-                Halftone
-              </button>
-              <button
-                className={`segmented-btn ${effectType === 'ascii' ? 'active' : ''}`}
-                onClick={() => setEffectType('ascii')}
-              >
-                ASCII
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="sidebar-section">
-          <div className="control-group">
-            <label className="control-label">Pixel Scale</label>
-            <div className="flex-row">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={pixelScale}
-                onChange={(e) => setPixelScale(parseInt(e.target.value))}
-              />
-              <input
-                type="number"
-                className="number-input"
-                value={pixelScale}
-                onChange={(e) => setPixelScale(parseInt(e.target.value))}
-              />
-            </div>
-          </div>
-
-          <div className="control-group">
-            <label className="control-label">Contrast</label>
-            <div className="flex-row">
-              <input
-                type="range"
-                min="0.1"
-                max="3.0"
-                step="0.1"
-                value={contrast}
-                onChange={(e) => setContrast(parseFloat(e.target.value))}
-              />
-              <input
-                type="number"
-                className="number-input"
-                step="0.1"
-                value={contrast}
-                onChange={(e) => setContrast(parseFloat(e.target.value))}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="sidebar-section">
-          <div className="control-group">
-            <label className="control-label">Appearance</label>
-            <div className="flex-row">
-              <span style={{ fontSize: '12px', color: 'var(--text-color)' }}>Primary Color</span>
-              <div className="color-picker-wrap">
-                <input
-                  type="color"
-                  value={accentColor}
-                  onChange={handleAccentChange}
-                />
-              </div>
-            </div>
-            <div className="flex-row">
-              <span style={{ fontSize: '12px', color: 'var(--text-color)' }}>Canvas Background</span>
-              <div className="color-picker-wrap">
-                <input
-                  type="color"
-                  value={bgColor}
-                  onChange={handleBgChange}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Tab hint */}
-        <div style={{
-          marginTop: 'auto',
-          padding: '16px',
-          borderTop: '1px solid var(--border-color)',
-          fontSize: '10px',
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          textAlign: 'center'
-        }}>
-          Press Tab to hide
-        </div>
-      </aside>
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleFileUpload}
+        accept="image/*"
+      />
 
       {/* Interactive Infinite Canvas Area */}
       <main
@@ -460,24 +303,18 @@ function App() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{
-          cursor: isSpaceDown.current ? 'grab' : 'default',
-          touchAction: 'none',
-          position: 'relative'
-        }}
+        style={{ cursor: 'default', touchAction: 'none' }}
       >
-        {/* Pixel Grid Layer — fades in at high zoom */}
+        {/* Persistent Pixel Dot Grid */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
             pointerEvents: 'none',
             backgroundImage: gridBackground,
-            backgroundSize: `${camera.z}px ${camera.z}px`,
+            backgroundSize: `${gridSize}px ${gridSize}px`,
             backgroundPosition: `${camera.x}px ${camera.y}px`,
             zIndex: 0,
-            opacity: gridOpacity,
-            transition: 'opacity 0.25s ease'
           }}
         />
 
@@ -487,13 +324,10 @@ function App() {
           transformOrigin: '0 0',
           willChange: 'transform',
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%'
+          top: 0, left: 0, width: '100%', height: '100%'
         }}>
           {items.map((item) => (
-            <PhysicsElement key={item.id} engine={engine} x={item.x} y={item.y}>
+            <PhysicsElement key={item.id} engine={engine} x={item.x} y={item.y} camera={camera}>
               <img
                 src={item.processedUrl}
                 alt="Generated Asset"
@@ -508,52 +342,224 @@ function App() {
             </PhysicsElement>
           ))}
         </div>
-
-        {/* Source Box Component */}
-        {originalImageUrl && (
-          <div className="source-box">
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '4px',
-              background: `url(${originalImageUrl}) center/cover`,
-              border: '1px solid var(--border-color)'
-            }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div className="source-box-title">Source Image</div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <div className={`color-swatch${swatch1Wiggle ? ' wiggle' : ''}`} style={{ background: accentColor }} />
-                <div className={`color-swatch${swatch2Wiggle ? ' wiggle' : ''}`} style={{ background: bgColor }} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Zoom Level Badge */}
-        <div className={`zoom-badge${zoomSpring ? ' updating' : ''}`}>
-          {Math.round(camera.z * 100)}%
-        </div>
-
-        {/* Tab = show panels hint when hidden */}
-        {panelsHidden && (
-          <div style={{
-            position: 'absolute',
-            bottom: 20,
-            left: 20,
-            background: 'var(--panel-bg)',
-            border: '1px solid var(--border-color)',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            color: 'var(--text-muted)',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            pointerEvents: 'none'
-          }}>
-            Press Tab to show panels
-          </div>
-        )}
       </main>
-      </div> {/* end workspace container */}
+
+      {/* UI Panels Overlay */}
+      <AnimatePresence>
+        {!panelsHidden && (
+          <>
+            {/* L E F T   P A N E L */}
+            <motion.aside 
+              className="floating-panel left-panel"
+              initial={{ x: -300, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -300, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            >
+              <div className="panel-header">
+                <span className="logo-text">Ditter.io</span>
+                <span style={{color: 'var(--text-muted)'}}><Code size={14} /></span>
+              </div>
+              <div className="panel-section">
+                <div className="segmented-control" style={{ marginBottom: 16 }}>
+                  <button className="segmented-btn active">Layers</button>
+                  <button className="segmented-btn">Assets</button>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="framer-button outline"
+                  style={{ width: '100%' }}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isExporting}
+                >
+                  <Upload size={14} /> Import Image
+                </motion.button>
+              </div>
+              
+              {/* Layer Display Shell */}
+              <div className="panel-section" style={{flex: 1, borderBottom: 'none'}}>
+                  {items.length === 0 ? (
+                      <div style={{color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', paddingTop: '20px'}}>
+                          No layers imported yet.
+                      </div>
+                  ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {items.map((it, idx) => (
+                              <div key={idx} style={{ padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '11px', color: 'var(--text-color)' }}>
+                                  Layer {idx + 1} (1-Bit)
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+            </motion.aside>
+
+            {/* R I G H T   P A N E L */}
+            <motion.aside 
+              className="floating-panel right-panel"
+              initial={{ x: 300, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 300, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            >
+              <div className="panel-section">
+                <div className="control-group">
+                  <label className="control-label">Effect Render</label>
+                  <div className="segmented-control">
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      className={`segmented-btn ${effectType === 'atkinson' ? 'active' : ''}`}
+                      onClick={() => setEffectType('atkinson')}
+                    >1-Bit</motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      className={`segmented-btn ${effectType === 'halftone' ? 'active' : ''}`}
+                      onClick={() => setEffectType('halftone')}
+                    >Halftone</motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      className={`segmented-btn ${effectType === 'ascii' ? 'active' : ''}`}
+                      onClick={() => setEffectType('ascii')}
+                    >ASCII</motion.button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="control-group">
+                  <label className="control-label">Pixel Scale</label>
+                  <div className="flex-row">
+                    <input type="range" min="1" max="20" value={pixelScale} onChange={(e) => setPixelScale(parseInt(e.target.value))} />
+                    <input type="number" className="number-input" value={pixelScale} onChange={(e) => setPixelScale(parseInt(e.target.value))} />
+                  </div>
+                </div>
+                <div className="control-group" style={{marginTop: '16px'}}>
+                  <label className="control-label">Contrast</label>
+                  <div className="flex-row">
+                    <input type="range" min="0.1" max="3.0" step="0.1" value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))} />
+                    <input type="number" className="number-input" step="0.1" value={contrast} onChange={(e) => setContrast(parseFloat(e.target.value))} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="control-group">
+                  <label className="control-label">Colors</label>
+                  <div className="flex-row">
+                    <div style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
+                         <span style={{color: 'var(--text-muted)', fontSize: '11px', textTransform:'uppercase'}}>{accentColor}</span>
+                    </div>
+                    <div className="color-picker-wrap">
+                      <input type="color" value={accentColor} onChange={handleAccentChange} />
+                    </div>
+                  </div>
+                  <div className="flex-row" style={{marginTop:'8px'}}>
+                    <div style={{ flex: 1, padding: '6px 10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>
+                         <span style={{color: 'var(--text-muted)', fontSize: '11px', textTransform:'uppercase'}}>{bgColor}</span>
+                    </div>
+                    <div className="color-picker-wrap">
+                      <input type="color" value={bgColor} onChange={handleBgChange} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="control-group">
+                  <label className="control-label">Export</label>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                     <Dropdown 
+                       options={[
+                         {label: 'SVG', value: 'svg'}, 
+                         {label: 'Figma', value: 'figma'}, 
+                         {label: 'Framer', value: 'framer'}
+                       ]} 
+                       value={exportFormat} 
+                       onChange={setExportFormat} 
+                     />
+                     <Dropdown 
+                       options={[
+                         {label: '1x', value: 1}, 
+                         {label: '2x', value: 2}, 
+                         {label: '4x', value: 4}
+                       ]} 
+                       value={exportScale} 
+                       onChange={setExportScale} 
+                         width="100px" 
+                     />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`framer-button primary${(figmaCopied || framerCopied) ? ' success' : ''}`}
+                    style={{ width: '100%' }}
+                    disabled={isExporting || !activeProcessedUrl}
+                    onClick={() => {
+                        if (exportFormat === 'svg') _handleExportSVG();
+                        else if (exportFormat === 'figma') _handleExportFigma();
+                        else if (exportFormat === 'framer') _handleExportFramer();
+                    }}
+                  >
+                    {figmaCopied || framerCopied ? <><Check size={14}/> Copied</> : <><Download size={14}/> Export</>}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.aside>
+
+            {/* Source Box Component mapped bottom left */}
+            {originalImageUrl && (
+              <motion.div 
+                className="source-box"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                style={{ top: 'auto', bottom: 16, left: 16 }}
+              >
+                <div style={{
+                  width: '40px', height: '40px', borderRadius: '4px',
+                  background: `url(${originalImageUrl}) center/cover`, border: '1px solid var(--border-color)'
+                }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div className="source-box-title">Source Image</div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <div className={`color-swatch${swatch1Wiggle ? ' wiggle' : ''}`} style={{ background: accentColor }} />
+                    <div className={`color-swatch${swatch2Wiggle ? ' wiggle' : ''}`} style={{ background: bgColor }} />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Zoom Level Badge */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className={`zoom-badge${zoomSpring ? ' updating' : ''}`}
+            >
+              {Math.round(camera.z * 100)}%
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {panelsHidden && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            style={{
+              position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+              background: 'var(--panel-bg)', border: '1px solid var(--border-color)',
+              padding: '6px 12px', borderRadius: '6px', fontSize: '11px', color: 'var(--text-muted)',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)', pointerEvents: 'none', zIndex: 100
+            }}>
+            Press Tab to show panels
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -2,114 +2,103 @@
  * Smoke tests for the PhysicsElement component
  *
  * Strategy: Since PhysicsElement tightly couples to Matter.js (which accesses
- * browser-specific APIs like WebGL), we mock the entire 'matter-js' module.
- * This lets us verify that the React component renders children correctly
- * and respects its positioning props — without needing a real physics engine.
+ * browser-specific APIs), we mock the entire 'matter-js' module.
+ * We test using pure React + ReactDOM to avoid @testing-library ESM conflicts.
  */
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { createRoot } from 'react-dom/client';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PhysicsElement from './PhysicsElement.jsx';
 
 // ─── Mock matter-js ───────────────────────────────────────────────────────────
-// We prevent all Matter.js calls from executing during tests.
-// The component still mounts and unmounts cleanly.
-
 vi.mock('matter-js', () => {
-  const mockBody = {
-    position: { x: 100, y: 200 },
-    angle: 0,
-  };
-
+  const mockBody = { position: { x: 100, y: 200 }, angle: 0 };
   return {
     default: {
-      Bodies: {
-        rectangle: vi.fn(() => mockBody),
-      },
-      Composite: {
-        add: vi.fn(),
-        remove: vi.fn(),
-      },
-      Body: {
-        applyForce: vi.fn(),
-      },
-      Events: {
-        on: vi.fn(),
-        off: vi.fn(),
-      },
+      Bodies: { rectangle: vi.fn(() => mockBody) },
+      Composite: { add: vi.fn(), remove: vi.fn() },
+      Body: { applyForce: vi.fn() },
+      Events: { on: vi.fn(), off: vi.fn() },
     },
   };
 });
 
-// ─── Minimal fake Matter.js engine ────────────────────────────────────────────
-const mockEngine = {
-  world: {},
-};
+const mockEngine = { world: {} };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('PhysicsElement', () => {
+  let container;
+  let root;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
   });
 
-  it('renders without crashing', () => {
-    render(
+  afterEach(() => {
+    root.unmount();
+    container.remove();
+    container = null;
+  });
+
+  // Helper to render and wait for React 19 to flush
+  const renderRender = async (element) => {
+    return new Promise(resolve => {
+      root.render(<div ref={() => resolve()}>{element}</div>);
+    });
+  };
+
+  it('renders without crashing and outputs children', async () => {
+    await renderRender(
       <PhysicsElement engine={mockEngine} x={100} y={200}>
-        <span>Hello</span>
+        <span id="child">Canvas Node</span>
       </PhysicsElement>
     );
-    // If we get here without throwing, the component mounted successfully
+    const child = container.querySelector('#child');
+    expect(child).not.toBeNull();
+    expect(child.textContent).toBe('Canvas Node');
   });
 
-  it('renders its children', () => {
-    render(
-      <PhysicsElement engine={mockEngine} x={100} y={200}>
-        <span data-testid="child">Canvas Node</span>
-      </PhysicsElement>
-    );
-    expect(screen.getByTestId('child')).toBeInTheDocument();
-    expect(screen.getByTestId('child')).toHaveTextContent('Canvas Node');
-  });
-
-  it('renders multiple children', () => {
-    render(
+  it('renders multiple children', async () => {
+    await renderRender(
       <PhysicsElement engine={mockEngine} x={50} y={50}>
-        <span data-testid="a">A</span>
-        <span data-testid="b">B</span>
+        <span id="a">A</span>
+        <span id="b">B</span>
       </PhysicsElement>
     );
-    expect(screen.getByTestId('a')).toBeInTheDocument();
-    expect(screen.getByTestId('b')).toBeInTheDocument();
+    expect(container.querySelector('#a')).not.toBeNull();
+    expect(container.querySelector('#b')).not.toBeNull();
   });
 
-  it('applies position: absolute to the wrapper div', () => {
-    const { container } = render(
+  it('applies position: absolute to the wrapper div', async () => {
+    await renderRender(
       <PhysicsElement engine={mockEngine} x={100} y={200}>
-        <div>Node</div>
+        <div id="target">Node</div>
       </PhysicsElement>
     );
-    const wrapper = container.firstChild;
-    expect(wrapper).toHaveStyle({ position: 'absolute' });
+    const wrapper = container.querySelector('#target').parentElement;
+    expect(wrapper.style.position).toBe('absolute');
   });
 
-  it('applies willChange: transform for GPU optimisation', () => {
-    const { container } = render(
+  it('applies willChange: transform for GPU optimisation', async () => {
+    await renderRender(
       <PhysicsElement engine={mockEngine} x={0} y={0}>
-        <div>Node</div>
+        <div id="target">Node</div>
       </PhysicsElement>
     );
-    const wrapper = container.firstChild;
-    expect(wrapper).toHaveStyle({ willChange: 'transform' });
+    const wrapper = container.querySelector('#target').parentElement;
+    expect(wrapper.style.willChange).toBe('transform');
   });
 
-  it('renders gracefully when no engine is provided', () => {
-    // Should not throw — the component guards with `if (!engine) return`
-    render(
+  it('renders gracefully when no engine is provided', async () => {
+    await renderRender(
       <PhysicsElement engine={null} x={0} y={0}>
-        <span data-testid="safe">Safe</span>
+        <span id="safe">Safe</span>
       </PhysicsElement>
     );
-    expect(screen.getByTestId('safe')).toBeInTheDocument();
+    expect(container.querySelector('#safe')).not.toBeNull();
   });
 });
