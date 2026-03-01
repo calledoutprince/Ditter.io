@@ -94,16 +94,10 @@ export const constructFigmaPayload = (pathData, width, height, hexColor) => {
  *   unavailable or the permission is denied.
  */
 export const copyHTMLToClipboard = async (htmlString) => {
-    try {
-        const type = "text/html";
-        const blob = new Blob([htmlString], { type });
-        const data = [new ClipboardItem({ [type]: blob })];
-        await navigator.clipboard.write(data);
-        alert("Copied to Figma Clipboard!");
-    } catch (err) {
-        console.error("Clipboard API failed: ", err);
-        alert("Failed to copy. See console.");
-    }
+    const type = "text/html";
+    const blob = new Blob([htmlString], { type });
+    const data = [new ClipboardItem({ [type]: blob })];
+    await navigator.clipboard.write(data);
 };
 
 // ─── Framer ──────────────────────────────────────────────────────────────────

@@ -101,15 +101,22 @@ const Dropdown = ({ options, value, onChange, placeholder = "Select...", width =
             {options.map((option) => (
               <button
                 key={option.value}
-                className={`dropdown-item ${value === option.value ? 'selected' : ''}`}
+                className={`dropdown-item ${value === option.value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''}`}
                 onClick={() => {
+                  if (option.disabled) return;
                   onChange(option.value);
                   setIsOpen(false);
                 }}
                 type="button"
+                disabled={option.disabled}
               >
                 <span>{option.label}</span>
-                {value === option.value && <Check size={14} color="var(--accent-blue)" />}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {option.tag && (
+                    <span className="dropdown-tag">{option.tag}</span>
+                  )}
+                  {value === option.value && !option.disabled && <Check size={14} color="var(--accent-blue)" />}
+                </span>
               </button>
             ))}
           </motion.div>

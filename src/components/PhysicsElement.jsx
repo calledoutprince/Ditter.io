@@ -55,7 +55,7 @@ import { motion } from 'framer-motion';
  * @returns {React.ReactElement} A `framer-motion` `div` positioned absolutely
  *   in the canvas world space, containing `children`.
  */
-const PhysicsElement = ({ engine, x, y, children, camera }) => {
+const PhysicsElement = ({ engine, x, y, children, camera, isSelected = false, onClick }) => {
     const elementRef = useRef(null);
     const bodyRef = useRef(null);
     const [position, setPosition] = useState({ x, y, angle: 0 });
@@ -190,6 +190,7 @@ const PhysicsElement = ({ engine, x, y, children, camera }) => {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onClick={onClick}
             animate={{ 
                 rotate: (position.angle * 180) / Math.PI
             }}
@@ -202,7 +203,10 @@ const PhysicsElement = ({ engine, x, y, children, camera }) => {
                 y: '-50%',
                 pointerEvents: 'auto', 
                 userSelect: 'none',   
-                willChange: 'transform' 
+                willChange: 'transform',
+                outline: isSelected ? '2px solid var(--accent-blue)' : 'none',
+                outlineOffset: '4px',
+                borderRadius: '2px',
             }}
         >
             {children}

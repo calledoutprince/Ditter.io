@@ -60,7 +60,7 @@ export function usePhysics() {
     });
     
     engineRef.current = engine;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEngineState(engine);
 
     // Create runner

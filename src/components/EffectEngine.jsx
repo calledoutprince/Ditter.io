@@ -175,6 +175,12 @@ export const applyColorMap = (imageData, accentColor) => {
  */
 const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, onProcessed }) => {
     const canvasRef = useRef(null);
+    const onProcessedRef = useRef(onProcessed);
+
+    // Keep the ref up-to-date without triggering the effect
+    useEffect(() => {
+        onProcessedRef.current = onProcessed;
+    }, [onProcessed]);
 
     useEffect(() => {
         if (!src) return;
@@ -183,12 +189,15 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, onPr
         img.crossOrigin = "Anonymous";
         img.onload = () => {
              const canvas = canvasRef.current;
+             if (!canvas) return;
              const ctx = canvas.getContext('2d', { willReadFrequently: true });
              
              // Scale down for pixelation
              const scaledWidth = Math.floor(img.width / pixelScale);
              const scaledHeight = Math.floor(img.height / pixelScale);
              
+             if (scaledWidth < 1 || scaledHeight < 1) return;
+
              canvas.width = scaledWidth;
              canvas.height = scaledHeight;
 
@@ -204,24 +213,22 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, onPr
                  applyAtkinsonDither(imageData, threshold);
              } else if (effectType === 'halftone') {
                  // Simplistic halftone placeholder logic
-                 // For true halftone, we'd draw overlapping circles. For simplicity, just high-contrast threshold
                  applyAtkinsonDither(imageData, threshold); 
              } else if (effectType === 'ascii') {
-                 // ASCII logic will require rendering text back to canvas, complex!
-                 // Simplified placeholder: heavy dither
+                 // ASCII placeholder: heavy dither
                  applyAtkinsonDither(imageData, threshold);
              }
 
              applyColorMap(imageData, accentColor);
              ctx.putImageData(imageData, 0, 0);
 
-             // Export the final processed URL to the parent for the active physics element
+             // Export the final processed URL to the parent
              const dataUrl = canvas.toDataURL('image/png');
-             if (onProcessed) onProcessed(dataUrl);
+             if (onProcessedRef.current) onProcessedRef.current(dataUrl);
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, accentColor, onProcessed]);
+    }, [src, effectType, pixelScale, contrast, accentColor]);
 
     return (
         <canvas 
