@@ -1,0 +1,272 @@
+# Interface Research: Figma & Paper.design → Ditter Gravity Studio
+
+> Research compiled 2026-02-28 · Reference: Ditter.io (`App.jsx`, `index.css`)
+
+---
+
+## 1. Executive Summary
+
+Ditter Gravity Studio is a physics-driven, dithering creative canvas. Both **Figma** (the industry-standard infinite canvas design tool) and **Paper.design** (a next-gen HTML/CSS-native design tool with built-in shader effects) represent the state of the art in creative canvas UX. This document distills the most relevant patterns from each and maps them to concrete improvements for our product.
+
+---
+
+## 2. Figma UI3 — Key Patterns
+
+Figma's **UI3 redesign (Config 2024)** represents the most significant shift in creative tool UX in recent years.
+
+### 2.1 Layout Architecture
+
+```
+┌──────────┬─────────────────────────────────┬──────────────┐
+│  Left    │                                 │   Right      │
+│  Panel   │        Infinite Canvas          │   Panel      │
+│  Layers  │                                 │  Properties  │
+│  Assets  │   ┌──────────────────────┐      │  Fills       │
+│          │   │  Floating Toolbar    │      │  Effects     │
+│          │   │    (bottom center)   │      │  Layout      │
+│          │   └──────────────────────┘      │              │
+└──────────┴─────────────────────────────────┴──────────────┘
+                        ↑
+              Canvas-maximizing design
+```
+
+**Key layout principles:**
+
+- **Dual sidebar architecture** — Left for structure/layers, Right for properties/controls
+- **Floating toolbar at the bottom** — Frees canvas real estate; contains only active tools
+- **Resizable & collapsible panels** — `[Tab]` hides all UI for full-canvas focus
+- **Context-sensitive right panel** — Content changes based on what's selected
+
+### 2.2 Navigation & Zoom
+
+| Action            | Shortcut                             |
+| ----------------- | ------------------------------------ |
+| Pan canvas        | `Space` + Drag, or Middle Mouse Drag |
+| Zoom in/out       | `Ctrl/Cmd` + Scroll                  |
+| Fit to canvas     | `Shift+1`                            |
+| Zoom to selection | `Shift+2`                            |
+| Zoom 100%         | `Shift+0`                            |
+| Box zoom          | Hold `Z`, drag                       |
+| Select tool       | `V`                                  |
+| Hand/Pan tool     | `H`                                  |
+| Frame tool        | `A`                                  |
+
+**Zoom display:** Always visible in bottom-right corner, clickable for custom input.
+
+### 2.3 Canvas Experience
+
+- **Infinite scrollable canvas** — No bounding box; world extends infinitely in all directions
+- **Dynamic pixel grid** — Appears at zoom ≥ 800% (similar to ~8× in our codebase)
+- **Snap to pixel** — All coordinates snap to integer world-pixels
+- **Multi-select** — Rubber-band select with drag
+- **Middle mouse** — Always pans regardless of active tool
+
+### 2.4 Toolbar Design (UI3)
+
+The bottom-center floating toolbar contains:
+
+```
+[Move] [Scale] [Frame] [Section] [Rectangle] [Ellipse] [Pen] [Pencil] [Text] | [Comment] [Plugins]
+```
+
+- Tool icons are **monochrome SVG**, 16×16
+- Active tool gets a **subtle background pill highlight**
+- Keyboard shortcut shown on hover tooltip
+- Separator `|` groups related tools
+
+### 2.5 Properties Panel (Right)
+
+- **Collapsible sections** with animated expand/collapse
+- Section headers are always visible even when collapsed
+- **Color chips** are interactive, open a picker popover
+- **Typography controls** use inline editing on click
+- Fill, Stroke, Effect, Export — all as collapsible accordion rows
+
+---
+
+## 3. Paper.design — Key Patterns
+
+Paper.design is a newer tool that positions itself as **HTML/CSS-native**, which makes it especially relevant for Ditter.io given our web export pipeline.
+
+### 3.1 Unique Differentiators
+
+| Feature                     | Paper.design                          | Relevance to Ditter.io                                  |
+| --------------------------- | ------------------------------------- | ------------------------------------------------------- |
+| **Built-in Shader effects** | GLSL shader overlays on any element   | Direct analogy to our dithering effects pipeline        |
+| **Flex/layout engine**      | "Wrap in Flex" for responsive layouts | Useful for exported asset compositions                  |
+| **HTML/CSS canvas**         | Designs ARE the code                  | Informs our "Copy to Figma" / export strategy           |
+| **AI image generation**     | ChatGPT, Ideogram, Flux built-in      | Possible future AI upload prompt feature                |
+| **Effect property panel**   | Shader parameters exposed as sliders  | Direct model for our Pixel Scale / Contrast / Effect UI |
+| **Dev Mode**                | Export production-ready CSS           | Analogy to our SVG Export + Figma Copy                  |
+
+### 3.2 Shader/Effect Panel Pattern
+
+Paper.design exposes shader parameters through **structured property groups**:
+
+```
+▾ Shader Effects
+  Type    ○ Overlay  ● Texture  ○ Animated
+  Opacity ────────●──── 78%
+  Scale   ─────●────── 4px
+  Noise   ──●────────── 0.3
+
+  [Preview Shader]
+```
+
+This is the **exact pattern** we should adopt for our Effect Engine — grouped sliders, live preview, labeled presets.
+
+### 3.3 Interface Layout
+
+- **Minimal top bar** — Just file name, share, and zoom %. No tool clutter at top
+- **Floating right panel** — Properties follow the selected element
+- **No persistent left panel** — Layers accessed via a pop-out sheet
+- **Canvas fills entire screen** — Maximum creative real estate
+
+---
+
+## 4. Current Ditter.io State
+
+### 4.1 What We Have
+
+| Feature                   | Status         | Notes                                    |
+| ------------------------- | -------------- | ---------------------------------------- |
+| Infinite canvas           | ✅ Implemented | `camera` state in `App.jsx`              |
+| Ctrl+Scroll zoom          | ✅ Implemented | Discrete ZOOM_LEVELS array               |
+| Space+Drag pan            | ✅ Implemented | `isSpaceDown` ref                        |
+| Pixel grid                | ✅ Implemented | Visible at zoom ≥ 8×                     |
+| Shift+1 fit, Shift+2 zoom | ✅ Implemented | Keyboard handlers                        |
+| Zoom % display            | ✅ Implemented | Bottom-right overlay                     |
+| Physics elements          | ✅ Implemented | `PhysicsElement` + Matter.js             |
+| Effect processing         | ✅ Implemented | `EffectEngine` (atkinson/halftone/ascii) |
+| Figma export              | ✅ Implemented | `constructFigmaPayload`                  |
+| SVG export                | ✅ Implemented | `vectorizeToSVG` + `downloadSVG`         |
+| Framer export             | ✅ Implemented | `constructFramerComponent`               |
+
+### 4.2 What We're Missing (vs Figma/Paper)
+
+| Gap                                                | Priority  | Effort |
+| -------------------------------------------------- | --------- | ------ |
+| **Bottom floating toolbar** (tools, zoom, modes)   | 🔴 High   | Medium |
+| **Dual panel layout** — Right panel for properties | 🔴 High   | Medium |
+| **Dark mode toggle**                               | 🔴 High   | Low    |
+| **Collapsible/resizable left sidebar**             | 🟡 Medium | Medium |
+| **Keyboard shortcut overlay** (`?` key)            | 🟡 Medium | Low    |
+| **Zoom % as clickable input**                      | 🟡 Medium | Low    |
+| **Middle mouse always pans**                       | 🟡 Medium | Low    |
+| **Continuous smooth zoom** (not discrete levels)   | 🟡 Medium | Medium |
+| **Tab = hide all UI**                              | 🟡 Medium | Low    |
+| **Box select / rubber band selection**             | 🟠 Low    | High   |
+| **Contextual right panel based on selection**      | 🟠 Low    | High   |
+
+---
+
+## 5. Proposed Ditter.io Adaptation
+
+### 5.1 Layout Redesign
+
+```mermaid
+graph LR
+  A["Left Panel\n(Layers / Assets)"] --> Canvas
+  Canvas["Infinite Canvas\n(physics + dither elements)"] --> B["Right Panel\n(Properties / Effects)"]
+  Canvas --> C["Bottom Toolbar\n(Move · Frame · Upload · Export · Zoom)"]
+  Canvas --> D["Top Bar\n(Logo · File Name · Share)"]
+```
+
+**Proposed layout (mirroring Figma UI3 + Paper.design style):**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [D] Dither Gravity Studio   ·   filename.dg   [Share] [▣]  │  ← Top Bar (40px)
+├──────────┬──────────────────────────────────┬───────────────┤
+│  Layers  │                                  │  Properties   │
+│  ──────  │                                  │  ──────────── │
+│ □ Img 1  │        Infinite Canvas           │ Effect Type   │
+│ □ Img 2  │      (physics world)             │ ○ 1-Bit       │
+│          │                                  │ ● Halftone    │
+│          │ ┌────────────────────────┐        │ ○ ASCII       │
+│          │ │ ← Move │↔Scale│ ⬛Frame │  100%│ │ ──────────── │
+│          │ └────────────────────────┘        │ Pixel Scale   │
+│          │        ↑ Floating Toolbar          │ ─────●── 4px  │
+└──────────┴──────────────────────────────────┴───────────────┘
+```
+
+### 5.2 Control Panel → Effect Panel (Paper.design Model)
+
+Convert the current monolithic left sidebar into a **right-side accordion Properties panel**:
+
+```
+▾ Effect Engine
+  Type     [1-Bit] [Halftone] [ASCII]
+
+▾ Parameters
+  Pixel Scale  ───────●─── 4
+  Contrast     ──────●──── 1.2
+
+▾ Brand Colors
+  Primary     ██ #0000ff
+  Background  ██ #e5e5e5
+
+▶ Export (collapsed)
+```
+
+### 5.3 Bottom Floating Toolbar
+
+Following **Figma's bottom toolbar pattern**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  [↖ Move]  [↔ Scale]  [⬛ Frame]  |  [⬆ Upload]  [↓ SVG]  [📋 Figma]  |  50% ▾  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.4 Keyboard Shortcuts to Add
+
+| Key                 | Action                          |
+| ------------------- | ------------------------------- |
+| `H`                 | Hand/Pan tool                   |
+| `V`                 | Select/Move tool                |
+| `Tab`               | Toggle hide/show all UI panels  |
+| `?`                 | Show keyboard shortcuts overlay |
+| `Shift+0`           | Zoom to 100%                    |
+| `Ctrl+-` / `Ctrl+=` | Zoom out / in                   |
+| `Middle mouse drag` | Always pan                      |
+
+### 5.5 Dark Mode
+
+Both Figma and Paper.design support dark mode. Ditter.io's current brutalist palette (white `#e5e5e5` + black `#000`) maps cleanly to:
+
+| Token             | Light     | Dark      |
+| ----------------- | --------- | --------- |
+| `--bg-color`      | `#e5e5e5` | `#111111` |
+| `--text-color`    | `#000000` | `#f0f0f0` |
+| `--border-color`  | `#000000` | `#333333` |
+| `--surface-color` | `#ffffff` | `#1a1a1a` |
+| `--accent-blue`   | `#0000ff` | `#4444ff` |
+
+---
+
+## 6. What NOT to Copy
+
+Learning from user backlash on Figma's UI3:
+
+- **Don't float the sidepanels** — Fixed-position panels are more reliable
+- **Don't remove keyboard shortcuts** in favor of mouse-only flows
+- **Don't over-AI** the interface — Our product's creative effects are the star, not AI suggestions
+- **Don't copy Paper.design's minimal layers panel** — We need layers visibility for physics objects
+
+---
+
+## 7. Prioritized Roadmap
+
+| #   | Feature                                 | From          | Priority |
+| --- | --------------------------------------- | ------------- | -------- |
+| 1   | Bottom floating toolbar                 | Figma UI3     | 🔴 P0    |
+| 2   | Right-side Properties panel (accordion) | Figma + Paper | 🔴 P0    |
+| 3   | Dark mode CSS tokens                    | Figma UI3     | 🔴 P0    |
+| 4   | Smooth continuous zoom (pinch/scroll)   | Both          | 🟡 P1    |
+| 5   | Zoom % clickable input + presets        | Figma         | 🟡 P1    |
+| 6   | Collapsible left panel                  | Figma UI3     | 🟡 P1    |
+| 7   | Tab = full-canvas mode                  | Figma         | 🟡 P1    |
+| 8   | Keyboard shortcut overlay               | Figma         | 🟠 P2    |
+| 9   | Layer panel for physics elements        | Figma         | 🟠 P2    |
+| 10  | Shader-style live preview               | Paper.design  | 🟠 P2    |

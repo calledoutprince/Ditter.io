@@ -1,7 +1,50 @@
-import React, { useEffect, useRef, useState } from 'react';
+/**
+ * @fileoverview Off-screen dithering pipeline for Ditter.io.
+ *
+ * `EffectEngine` is a **headless** React component — it renders a hidden
+ * `<canvas>` element, processes an image through the selected dithering
+ * algorithm, and notifies the parent via a callback with the resulting
+ * data URL.  It never displays anything to the user directly.
+ *
+ * Exported pixel-manipulation functions are also tested individually in
+ * `EffectEngine.test.js`.
+ *
+ * @module EffectEngine
+ */
 
-// Atkinson Dithering matrix processing
-const applyAtkinsonDither = (imageData, threshold) => {
+import React, { useEffect, useRef } from 'react';
+
+// ─── Pixel Algorithms (exported for unit testing) ────────────────────────────
+
+/**
+ * Applies Atkinson dithering in-place to a raw `ImageData` object.
+ *
+ * Atkinson is a 1-bit error-diffusion algorithm originally developed by Bill
+ * Atkinson for the original Macintosh.  It diffuses only 6/8 of the
+ * quantisation error (rather than the full amount used by Floyd–Steinberg),
+ * which tends to preserve highlight and shadow detail better on printed or
+ * pixelated output.
+ *
+ * **Kernel** (error distributed equally to each marked cell):
+ * ```
+ *       X   X+1  X+2
+ * Y        [cur] [ ⅛] [ ⅛]
+ * Y+1  [⅛] [ ⅛]  [⅛]
+ * Y+2        [⅛]
+ * ```
+ *
+ * The function first converts the image to greyscale using the standard ITU-R
+ * BT.601 luminance coefficients, then performs the error-diffusion pass.
+ *
+ * @param {ImageData} imageData - A mutable `ImageData` instance obtained from
+ *   `CanvasRenderingContext2D.getImageData()`.  Modified in-place.
+ * @param {number} threshold    - The greyscale luminance threshold (0–255)
+ *   below which a pixel is quantised to black.  Derived from the user's
+ *   contrast setting: `threshold = 128 / contrast`.
+ * @returns {ImageData} The same `imageData` reference, mutated in-place.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const applyAtkinsonDither = (imageData, threshold) => {
     const data = imageData.data;
     const width = imageData.width;
     
@@ -48,8 +91,23 @@ const applyAtkinsonDither = (imageData, threshold) => {
     return imageData;
 };
 
-// Replace black and white with Brand HEX colors
-const applyColorMap = (imageData, accentColor, bgColor) => {
+/**
+ * Re-colours the dithered pixel data in-place using the user's accent colour.
+ *
+ * After dithering, every pixel is either pure black (`< 128` luminance) or
+ * pure white.  This function maps:
+ * - **Black pixels** → the user's accent colour (fully opaque).
+ * - **White pixels** → fully transparent, so the page / canvas background
+ *   shows through without a white box around the asset.
+ *
+ * @param {ImageData} imageData   - A mutable `ImageData` instance that has
+ *   already been processed by a dithering function.  Modified in-place.
+ * @param {string}   accentColor  - The fill colour as a CSS hex string
+ *   (e.g. `"#0000ff"`).
+ * @returns {ImageData} The same `imageData` reference, mutated in-place.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const applyColorMap = (imageData, accentColor) => {
     const data = imageData.data;
     
     // Parse hex
@@ -63,12 +121,11 @@ const applyColorMap = (imageData, accentColor, bgColor) => {
     };
 
     const fg = hexToRgb(accentColor);
-    const bg = hexToRgb(bgColor);
 
     for (let i = 0; i < data.length; i += 4) {
         // If pixel is black (dithered), make it accent
         if (data[i] < 128) {
-            data[i] = fg.r;
+            data[i]   = fg.r;
             data[i+1] = fg.g;
             data[i+2] = fg.b;
             data[i+3] = 255; // Opaque
@@ -80,9 +137,50 @@ const applyColorMap = (imageData, accentColor, bgColor) => {
     return imageData;
 };
 
-const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, bgColor, onProcessed }) => {
+// ─── Component ───────────────────────────────────────────────────────────────
+
+/**
+ * Headless image-processing component that runs the dithering pipeline on
+ * every input change and reports the result upward.
+ *
+ * **Rendering:** The component returns a hidden `<canvas>` element.  It is
+ * never visible; it only exists so we have a 2D drawing context to work with.
+ *
+ * **Pipeline (per effect change):**
+ * 1. Load `src` into an `<img>` element.
+ * 2. Scale the image down by `pixelScale` (creates the chunky pixel look).
+ * 3. Derive a luminance threshold from `contrast`.
+ * 4. Run the selected dithering pass (`applyAtkinsonDither` for all three
+ *    modes currently; halftone and ASCII are placeholder stubs).
+ * 5. Remap black pixels to `accentColor` and white pixels to transparent
+ *    via `applyColorMap`.
+ * 6. Export the canvas as a PNG data URL and call `onProcessed`.
+ *
+ * @param {Object}   props
+ * @param {string}   props.src          - Object URL or data URL of the source
+ *   image to process.
+ * @param {'atkinson'|'halftone'|'ascii'} props.effectType
+ *   - Which dithering algorithm to apply.
+ * @param {number}   props.pixelScale   - Downscale factor (1–20).  Higher
+ *   values produce larger, more obvious pixels.
+ * @param {number}   props.contrast     - Contrast multiplier (0.1–3.0).
+ *   Applied as: `threshold = 128 / contrast`.
+ * @param {string}   props.accentColor  - Foreground fill colour as a CSS hex
+ *   string (e.g. `"#0000ff"`).
+ * @param {function(string): void} props.onProcessed
+ *   - Called with the final `data:image/png;base64,…` string after each
+ *     processing pass completes.
+ * @returns {React.ReactElement} A hidden `<canvas>` element used internally
+ *   for pixel manipulation.
+ */
+const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, onProcessed }) => {
     const canvasRef = useRef(null);
-    const imgRef = useRef(null);
+    const onProcessedRef = useRef(onProcessed);
+
+    // Keep the ref up-to-date without triggering the effect
+    useEffect(() => {
+        onProcessedRef.current = onProcessed;
+    }, [onProcessed]);
 
     useEffect(() => {
         if (!src) return;
@@ -91,12 +189,15 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, bgCo
         img.crossOrigin = "Anonymous";
         img.onload = () => {
              const canvas = canvasRef.current;
+             if (!canvas) return;
              const ctx = canvas.getContext('2d', { willReadFrequently: true });
              
              // Scale down for pixelation
              const scaledWidth = Math.floor(img.width / pixelScale);
              const scaledHeight = Math.floor(img.height / pixelScale);
              
+             if (scaledWidth < 1 || scaledHeight < 1) return;
+
              canvas.width = scaledWidth;
              canvas.height = scaledHeight;
 
@@ -112,24 +213,22 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, bgCo
                  applyAtkinsonDither(imageData, threshold);
              } else if (effectType === 'halftone') {
                  // Simplistic halftone placeholder logic
-                 // For true halftone, we'd draw overlapping circles. For simplicity, just high-contrast threshold
                  applyAtkinsonDither(imageData, threshold); 
              } else if (effectType === 'ascii') {
-                 // ASCII logic will require rendering text back to canvas, complex!
-                 // Simplified placeholder: heavy dither
+                 // ASCII placeholder: heavy dither
                  applyAtkinsonDither(imageData, threshold);
              }
 
-             applyColorMap(imageData, accentColor, bgColor);
+             applyColorMap(imageData, accentColor);
              ctx.putImageData(imageData, 0, 0);
 
-             // Export the final processed URL to the parent for the active physics element
+             // Export the final processed URL to the parent
              const dataUrl = canvas.toDataURL('image/png');
-             if (onProcessed) onProcessed(dataUrl);
+             if (onProcessedRef.current) onProcessedRef.current(dataUrl);
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, accentColor, bgColor, onProcessed]);
+    }, [src, effectType, pixelScale, contrast, accentColor]);
 
     return (
         <canvas 

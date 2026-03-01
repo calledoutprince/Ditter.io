@@ -1,8 +1,41 @@
-// Formatting SVG Compound Path for Figma Clipboard JSON structure
+/**
+ * @fileoverview Design-tool integration helpers for Ditter.io.
+ *
+ * Provides utilities for exporting dithered assets to Figma (via the HTML
+ * clipboard protocol) and Framer (as a ready-to-paste Code Component), as
+ * well as low-level clipboard and colour-conversion helpers.
+ *
+ * @module integrations
+ */
+
+// ─── Figma ───────────────────────────────────────────────────────────────────
+
+/**
+ * Builds an HTML string that Figma's internal clipboard parser recognises as
+ * a pasteable SVG vector layer.
+ *
+ * Figma's paste handler inspects the `text/html` clipboard type for a
+ * `(figmeta)` comment containing a base64-encoded JSON descriptor followed
+ * by an inline SVG element.  When both are present, Figma imports the shape
+ * as a VECTOR node rather than a rasterised image.
+ *
+ * @param {string} pathData  - SVG compound path `d` attribute string produced
+ *   by {@link module:vectorizer.vectorizeToSVG}.
+ * @param {number} width     - Intrinsic width of the original dithered image
+ *   (pixels).  Used to set the SVG `viewBox`.
+ * @param {number} height    - Intrinsic height of the original dithered image
+ *   (pixels).  Used to set the SVG `viewBox`.
+ * @param {string} hexColor  - Accent fill colour as a CSS hex string
+ *   (e.g. `"#0000ff"`).
+ * @returns {string} An HTML fragment containing the figmeta comment followed
+ *   by a `<svg>` element, ready to be written to the `text/html` clipboard
+ *   slot via {@link copyHTMLToClipboard}.
+ */
 export const constructFigmaPayload = (pathData, width, height, hexColor) => {
     // 1. Generate the node structure for Figma
     const colorObj = hexToFigmaColor(hexColor);
     
+    // eslint-disable-next-line no-unused-vars
     const figmaNode = {
         name: "Dithered-Gravity-Layer",
         type: "VECTOR",
@@ -49,20 +82,40 @@ export const constructFigmaPayload = (pathData, width, height, hexColor) => {
     return `<meta charset="utf-8"><!--(figmeta)${meta}-->${rawSvg}`;
 };
 
+/**
+ * Writes an HTML string to the system clipboard using the async Clipboard API.
+ *
+ * The `text/html` MIME type is required so that Figma recognises the payload
+ * as a pasteable design element (see {@link constructFigmaPayload}).
+ *
+ * @param {string} htmlString - The HTML content to place on the clipboard.
+ * @returns {Promise<void>} Resolves when the clipboard write succeeds.
+ * @throws Will log to console and show an alert if the Clipboard API is
+ *   unavailable or the permission is denied.
+ */
 export const copyHTMLToClipboard = async (htmlString) => {
-    try {
-        const type = "text/html";
-        const blob = new Blob([htmlString], { type });
-        const data = [new ClipboardItem({ [type]: blob })];
-        await navigator.clipboard.write(data);
-        alert("Copied to Figma Clipboard!");
-    } catch (err) {
-        console.error("Clipboard API failed: ", err);
-        alert("Failed to copy. See console.");
-    }
+    const type = "text/html";
+    const blob = new Blob([htmlString], { type });
+    const data = [new ClipboardItem({ [type]: blob })];
+    await navigator.clipboard.write(data);
 };
 
-// Formatting a React Component for Framer Code
+// ─── Framer ──────────────────────────────────────────────────────────────────
+
+/**
+ * Generates source code for a Framer Code Component pre-populated with the
+ * dithered SVG path and accent colour.
+ *
+ * The returned string can be pasted directly into Framer's code editor.  It
+ * creates a component called `DitherAsset` with an `accentColor` property
+ * control so designers can override the fill from Framer's canvas.
+ *
+ * @param {string} pathData - SVG compound path `d` attribute string produced
+ *   by {@link module:vectorizer.vectorizeToSVG}.
+ * @param {string} hexColor - Default accent colour for the component as a CSS
+ *   hex string (e.g. `"#0000ff"`).
+ * @returns {string} Complete JSX source code for the Framer component.
+ */
 export const constructFramerComponent = (pathData, hexColor) => {
     return `import React from "react"
 import { addPropertyControls, ControlType } from "framer"
@@ -91,7 +144,17 @@ addPropertyControls(DitherAsset, {
 `;
 };
 
-// Utilities
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+/**
+ * Converts a CSS hex colour string to Figma's normalised RGBA object
+ * (channels in the `[0, 1]` range).
+ *
+ * @param {string} hex - A 6-digit hex colour string with a leading `#`
+ *   (e.g. `"#ff0000"`).
+ * @returns {{ r: number, g: number, b: number, a: number }} Figma-compatible
+ *   colour object with `a` always set to `1` (fully opaque).
+ */
 const hexToFigmaColor = (hex) => {
     const r = parseInt(hex.slice(1, 3), 16) / 255;
     const g = parseInt(hex.slice(3, 5), 16) / 255;
