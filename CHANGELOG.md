@@ -7,6 +7,29 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [0.3.0] - 2026-03-02
+
+### Added
+
+- "Copy to Clipboard" functionality for dithered layers
+- Custom `ColorPickerPopover` with drag/positioning support
+- Dedicated `colors.js` and `dither.js` utility modules
+- `roadmap.md` for project planning
+
+### Changed
+
+- Major redesign of the Export panel with grid layout and primary actions
+- Refined terminal "Vector" naming consistency
+- Improved logo glitch and wiggle animations
+- Standardized CSS property formatting for better readability
+
+### Fixed
+
+- Color picker positioning relative to the side panel
+- UI layout scaling for smaller viewports
+
+---
+
 ## [0.1.0] - 2026-03-01
 
 ### Added
