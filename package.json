@@ -14,10 +14,12 @@
     "check": "npm run lint && npm run build"
   },
   "dependencies": {
+    "colord": "^2.9.3",
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.575.0",
     "matter-js": "^0.20.0",
     "react": "^19.2.0",
+    "react-colorful": "^5.6.1",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {

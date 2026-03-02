@@ -1,0 +1,158 @@
+.color-picker-popover {
+  background: var(--panel-bg, #1a1a1a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 0 12px 12px 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  width: 250px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.popover-drag-handle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--text-dim, #666);
+  cursor: grab;
+  transition: color 0.15s;
+}
+
+.popover-drag-handle:active {
+  cursor: grabbing;
+}
+
+.color-picker-popover:hover .popover-drag-handle {
+  color: var(--text-muted, #999);
+}
+
+.color-picker-popover:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.color-picker-popover.dragging {
+  opacity: 0.95;
+  border-color: var(--accent-color, #007aff);
+}
+
+/* react-colorful overrides */
+.react-colorful {
+  width: 100% !important;
+  height: auto !important;
+  gap: 12px;
+}
+
+.react-colorful__saturation {
+  border-radius: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  height: 160px !important;
+  margin-bottom: 12px;
+}
+
+.react-colorful__hue,
+.react-colorful__alpha {
+  height: 12px !important;
+  border-radius: 6px !important;
+  margin-bottom: 8px;
+}
+
+.react-colorful__pointer {
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid white !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+.popover-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mode-dropdown {
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.mode-dropdown:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.color-inputs-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.color-input-box {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  color: #eee;
+  border: 1px solid var(--border-color, #333);
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: center;
+  font-family: inherit;
+  width: 100%;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.color-input-box:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Hide number arrows */
+.color-input-box::-webkit-outer-spin-button,
+.color-input-box::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.color-input-box[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.alpha-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  padding-right: 6px;
+}
+
+.alpha-input {
+  background: transparent;
+  border: none;
+  width: 32px;
+  padding-right: 0;
+}
+
+.alpha-input:focus {
+  background: transparent;
+  border: none;
+}
+
+.alpha-symbol {
+  font-size: 10px;
+  color: #888;
+}
