@@ -8,13 +8,8 @@ import PhysicsElement from './components/PhysicsElement';
 import EffectEngine from './components/EffectEngine';
 import { extractDominantColors } from './utils/colors';
 import ColorPickerPopover from './components/ColorPickerPopover';
-import {
-  applyAtkinsonDither,
-  applyHalftoneDither,
-  applyColorMap,
-  generateSVG
-} from './utils/dither';
-import { applyAsciiEffect } from './components/EffectEngine';
+import { vectorizeToSVG, downloadSVG } from './utils/vectorizer';
+import { copyHTMLToClipboard, constructFigmaPayload } from './utils/integrations';
 import Dropdown from './components/Dropdown';
 import LayerItem from './components/LayerItem';
 import './index.css';
@@ -291,98 +286,27 @@ function App() {
 
   const handleExport = async () => {
     if (!selectedLayer) return;
-
-    // Load image
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.src = selectedLayer.originalUrl;
-
-    await new Promise(resolve => { img.onload = resolve; });
-
-    const { effectType, pixelScale, contrast, colors, hiddenColors, name } = selectedLayer;
-    const activeColors = { ...colors };
-    if (hiddenColors) {
-      hiddenColors.forEach(hc => { delete activeColors[hc]; });
-    }
-
-    const scale = parseInt(exportScale.replace('x', ''));
-    const isAscii = effectType === 'ascii';
-
-    // Base dimensions (original image / pixelScale)
-    const baseW = Math.floor(img.width / rawPixelScale(pixelScale));
-    const baseH = Math.floor(img.height / rawPixelScale(pixelScale));
-
-    // Output dimensions (scaled)
-    const outW = baseW * scale;
-    const outH = baseH * scale;
-
-    const exportCanvas = document.createElement('canvas');
-    if (isAscii) {
-      // ASCII needs a larger canvas for the characters
-      const charScale = 8;
-      exportCanvas.width = baseW * charScale * scale;
-      exportCanvas.height = baseH * charScale * scale;
-    } else {
-      exportCanvas.width = outW;
-      exportCanvas.height = outH;
-    }
-
-    const ctx = exportCanvas.getContext('2d');
-
-    // Create processing canvas at base resolution
-    const procCanvas = document.createElement('canvas');
-    procCanvas.width = baseW;
-    procCanvas.height = baseH;
-    const pctx = procCanvas.getContext('2d');
-    pctx.drawImage(img, 0, 0, baseW, baseH);
-
-    let imageData = pctx.getImageData(0, 0, baseW, baseH);
-    const isTriColor = activeColors.midtone !== undefined && activeColors.midtone !== null && activeColors.midtone !== '';
-
-    if (effectType === 'atkinson') {
-      const threshold = 128 * (1 / rawContrast(contrast));
-      applyAtkinsonDither(imageData, threshold, isTriColor);
-      applyColorMap(imageData, activeColors);
-    } else if (effectType === 'halftone') {
-      applyHalftoneDither(imageData, rawContrast(contrast), isTriColor);
-      applyColorMap(imageData, activeColors);
-    }
+    const canvas = document.querySelector('canvas');
+    if (!canvas) return;
 
     try {
-      if (exportFormat === 'vector') {
-        // Generate SVG from the processed pixels
-        const svgString = generateSVG(imageData, scale, activeColors);
-        const blob = new Blob([svgString], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.svg`;
-        link.click();
-      } else if (isAscii) {
-        // ASCII Render to export canvas
-        applyAsciiEffect(imageData, ctx, baseW, baseH, exportCanvas.width, exportCanvas.height, rawContrast(contrast), activeColors);
-        const blob = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/png'));
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.png`;
-        link.click();
-      } else {
-        // Normal Image Export (upscaled pixels)
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = baseW;
-        tempCanvas.height = baseH;
-        tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+      if (exportFormat === 'image' || exportFormat === 'webp') {
+        const mimeType = exportFormat === 'webp' ? 'image/webp' : 'image/png';
+        const extension = exportFormat === 'webp' ? 'webp' : 'png';
 
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tempCanvas, 0, 0, outW, outH);
-
-        const blob = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/png'));
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType));
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.png`;
+        link.download = `ditter-${selectedLayer.name.toLowerCase().replace(/\s+/g, '-')}.${extension}`;
         link.click();
+        triggerCanvasFlash();
+      } else if (exportFormat === 'vector') {
+        const dataUrl = canvas.toDataURL('image/png');
+        const bgHex = selectedLayer.colors.shadow || '#000000';
+        const { svgString } = await vectorizeToSVG(dataUrl, bgHex);
+        downloadSVG(svgString, `ditter-${selectedLayer.name.toLowerCase().replace(/\s+/g, '-')}.svg`);
+        triggerCanvasFlash();
       }
 
       setExportSuccess(true);
@@ -893,12 +817,10 @@ function App() {
                     <Dropdown
                       options={[
                         { label: 'PNG', value: 'image' },
-                        { label: 'Vector', value: 'vector', tag: 'Fast' },
-                        { label: 'WebP', value: 'webp', disabled: true },
-                        { label: 'SVG', value: 'svg_path', disabled: true, tag: 'Paths' },
-                        { label: 'Figma', value: 'figma', disabled: true, tag: 'BETA' },
-                        { label: 'Framer', value: 'framer', disabled: true },
-                        { label: 'PDF', value: 'pdf', disabled: true }
+                        { label: 'WebP', value: 'webp' },
+                        { label: 'Vector (SVG)', value: 'vector' },
+                        { label: 'Figma', value: 'figma', disabled: true, tag: 'WIP' },
+                        { label: 'PDF', value: 'pdf', disabled: true, tag: 'Soon' },
                       ]}
                       value={exportFormat}
                       onChange={setExportFormat}
