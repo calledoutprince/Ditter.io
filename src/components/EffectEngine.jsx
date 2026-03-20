@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const applyAtkinsonDither = (imageData, threshold, isTriColor = true) => {
@@ -185,12 +185,15 @@ export const applyAsciiDither = (imageData, ctx, sw, sh, ow, oh, contrast, color
     }
 };
 
-const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colors, onProcessed }) => {
+const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colors, pre, onProcessed }) => {
     const canvasRef = useRef(null);
     const onProcessedRef = useRef(onProcessed);
 
     // Backwards compatibility during migration
-    const activeColors = colors || { shadow: accentColor, midtone: '#888888', highlight: 'transparent' };
+    const activeColors = useMemo(
+        () => colors || { shadow: accentColor, midtone: '#888888', highlight: 'transparent' },
+        [colors, accentColor]
+    );
     const isTriColor = activeColors.midtone !== undefined && activeColors.midtone !== null && activeColors.midtone !== '';
 
     useEffect(() => {
@@ -224,7 +227,11 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
             tempCanvas.width = scaledWidth;
             tempCanvas.height = scaledHeight;
             const tctx = tempCanvas.getContext('2d', { willReadFrequently: true });
+            if (pre?.blur > 0) {
+                tctx.filter = `blur(${pre.blur}px)`;
+            }
             tctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+            tctx.filter = 'none'; // reset filter so it doesn't leak
 
             let imageData = tctx.getImageData(0, 0, scaledWidth, scaledHeight);
 
@@ -247,7 +254,7 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, activeColors]);
+    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur]);
 
     return (
         <canvas

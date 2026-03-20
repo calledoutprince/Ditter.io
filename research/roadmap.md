@@ -4,78 +4,167 @@
 
 ---
 
-## Phase 1: Core Dithering & Visual Enhancements (Next Up)
+## ✅ Foundation (Shipped)
 
-This phase focuses on expanding the core visual expression tools before moving into heavy workflow features.
+> Everything here is live and tested.
 
-- **3-Color Dithering**
-  - Extract dominant colors from imported images to set defaults.
-  - Expose a 3-color mapping system (Shadows, Midtones, Highlights) allowing users to override the extracted colors.
-  - Ensure the effect renders live on the canvas.
-- **Enhanced Render Targets**
-  - **Text Layers**: Add support for rendering text with dithering applied. Integrate Google Fonts (or similar) to provide a robust default set of typography. Text should be toggleable to either sit _under_ the effects pipeline or float _above_ it cleanly.
-- **Masks & Lenses**
-  - Introduce "Area of focus" shapes (circles/rectangles).
-  - These act as movable magnifying glasses/lenses over the canvas: the dithering effect is only applied _inside_ the shape, revealing the original image outside (or vice-versa).
-  - Support setting shape fills to solid colors, gradients, images, or videos.
-- **Additional Effects**
-  - Research and implement new visual algorithms: Radial effects, Wave distortions, and an experimental "Ditter on Glass" optical effect.
-
----
-
-## Phase 2: Animation & Motion
-
-Bringing the static outputs to life through algorithmic motion.
-
-- **Effect Animation Behaviors**
-  - Animate the dithering patterns themselves.
-  - Directions: Vertical (up/down), Horizontal (left/right), and Diagonal (all 4 ways).
-- **Exporting Motion**
-  - Built-in rendering engine to export animated canvas states.
-  - Support exporting to MP4, WebM (for web transparency), and legacy GIFs.
+- Per-layer state architecture (each layer has its own effect, colors, opacity, visibility)
+- Layer panel with inline rename (F2/double-click), eye toggle, thumbnail
+- Physics canvas with layer selection (blue outline), drag-and-drop, Ctrl+V paste
+- **1-Bit (Atkinson)** dithering — real error-diffusion algorithm
+- **Halftone** — real Bayer 4×4 ordered dither matrix
+- **ASCII** — real character-rendering pipeline with 8× upscale
+- **3-Color mapping** (Shadow / Midtone / Highlight) — live color pickers per layer
+- Custom sliders (blue-fill track, percentage pill)
+- PNG export with nearest-neighbour upscaling (1×/2×/4×)
+- Key bindings: Delete, F2, Ctrl+Z, Ctrl+V, Tab, Escape, `?`
+- `effectEnabled: false` by default — raw image shows until user picks an effect
 
 ---
 
-## Phase 3: Workflow, Integrations & Context
+## Phase 1 — Richer Dithering & Visual Depth
 
-Improving how Ditter.io fits into professional design workflows.
+_Goal: make Ditter.io the most expressive dither tool — deep controls, more algorithms, more ways to shape the image._
 
-- **Figma / Framer / Affinity Integration**
-  - Support direct clipboard pasting from external tools.
-  - _Phase 3a_: Initial support as flattened raster images (predictable dithering).
-  - _Phase 3b_: Investigate supporting editable vector layers from clipboard payloads.
-- **Contextual Menus (Right-Click)**
-  - Implement a custom canvas context menu.
-  - Provide quick actions: Apply suggested effects, layer management, quick export, and component grouping.
-- **Grouping ("Frames")**
-  - Group layers (shapes, images, text) into "Frames" so they move as one rigid body in the physics engine and share effect boundaries.
+### 1.1 Pre-Processing Pipeline
+
+- **Pre-Blur** (0–20 px) — soften image before dithering to smooth band edges
+- **Pre-Brightness** (-100 → +100) — lift or crush exposure before threshold
+- **Pre-Contrast** (-100 → +100) — expand or compress tonal range
+- **Pre-Sharpness** (0–100) — unsharp-mask pass to punch up edges
+- **Gamma** (0.2–4.0) — non-linear tone curve before the dither pass
+
+### 1.2 Expanded Algorithm Library
+
+- **Floyd-Steinberg** — the standard error-diffusion reference
+- **Jarvis-Judice-Ninke** — 12-neighbor spread; smoothest gradients
+- **Stucki** — sharper JJN variant
+- **Burkes** — faster, lighter variant
+- **Sierra** family (Full / Two-Row / Lite)
+- **Bayer 2×2 / 8×8 / 16×16** — finer or coarser ordered patterns
+- **Checkerboard** — sharp alternating grid pattern
+- **Serpentine scan toggle** — reverses diffusion direction on alternate rows (kills directional bias)
+- **Bit Depth** (1–8 bit) — quantise to N output levels, not just 1-bit B&W
+- **Color Space selector** — Luma / RGB / CIELAB for the threshold calculation
+
+### 1.3 Palette Presets & Color Tools
+
+- **Retro presets** — Game Boy (4), PICO-8 (16), Commodore 64 (16), CGA/EGA, Vaporwave, Ink/Paper
+- **Custom palette import** — paste hex codes or import from Lospec URL
+- **Auto-extraction** — extract dominant colors from source image to pre-fill Shadow/Midtone/Highlight
+- **"Surprise me"** — random curated palette for quick inspiration
+
+### 1.4 Post-Processing & Blending
+
+- **Noise/Grain overlay** (0–100%) — adds film grain after dithering for a "human" imperfect feel
+- **Diffusion Bias** (-1.0 → +1.0) — nudge quantisation toward lighter or darker output
+- **Intensity blend** (0–100%) — blend dithered result with the original image
+
+### 1.5 Text Layers
+
+- Add a text element type to the canvas (alongside image layers)
+- Integrate Google Fonts for a robust type selection
+- Toggle: text sits _under_ the dither effect pipeline or floats _above_ it cleanly
+
+### 1.6 Masks & Lenses
+
+- Circle and rectangle area-of-focus shapes on the canvas
+- Dither effect applies only _inside_ (or outside) the shape — revealing raw image beyond
+- Shape fills: solid color, gradient, image, or video
+
+### 1.7 Additional Effects
+
+- **Radial dither** — effect intensity radiates from a center point
+- **Wave distortion** — sinusoidal warp applied before the dither pass
+- **"Ditter on Glass"** — experimental optical refraction / frosted-glass look
 
 ---
 
-## Phase 4: UX Polish & Persistence
+## Phase 2 — Animation & Motion
 
-Making the app reliable, immersive, and retentive.
+_Goal: bring dithered frames to life for motion designers, social content, and lo-fi video._
 
-- **Local Persistence (IndexedDB)**
-  - Move beyond transient state. Auto-save the canvas layout, images, and effect parameters to the browser's IndexedDB.
-  - Users can safely refresh or recover from a crash without losing their session.
-- **Immersive Sound Design**
-  - Implement a tactile, delightful UI sound system (using Web Audio API or a library like `howler.js`).
-  - Triggers on key actions: First image import, dropping an element, toggling heavy effects, and copying to clipboard.
-- **First-Time User Experience (FTUE)**
-  - Design a beautiful, lightweight loading animation or onboarding state that introduces the physics/dithering concept immediately.
+### 2.1 Effect Animation Behaviors
+
+- Animate dither patterns procedurally: Vertical, Horizontal, Diagonal (all 4 directions)
+- Configurable speed and direction per layer
+
+### 2.2 Frame Input
+
+- Import GIF or short video clip → split into editable frames
+- Per-frame dither settings, or batch-apply a single parameter set across all frames
+- Frame timing editor (adjust delay per frame)
+
+### 2.3 Motion Export
+
+- **Animated GIF** — via `gif.js` (client-side, no server)
+- **WebM** — canvas `MediaRecorder` for transparency support
+- **MP4** — via `CCapture.js` or native browser recording APIs
 
 ---
 
-## Phase 5: Cloud & Community (Long Term)
+## Phase 3 — Workflow, Integrations & Reach
 
-Transitioning from a local studio to a platform.
+_Goal: fit into professional design workflows and make Ditter.io shareable._
 
-- **Accounts & Freemium Model**
-  - All core prototyping, local saving, and basic exports remain free and accessible without login.
-  - Introduce User Accounts (via Supabase/Firebase) for premium features:
-    - Cloud syncing of workspaces across devices.
-    - Heavy video processing/rendering offloaded to the server.
-    - Early access flags for experimental effects.
+### 3.1 Vector Export
+
+- Output SVG dither patterns — scalable for branding, UI, and print
+- Illustrator / Figma friendly import
+
+### 3.2 Shareable Links
+
+- Encode all effect settings into URL parameters
+- Share a link → recipient opens the exact same canvas state
+
+### 3.3 Figma / Framer / Affinity Integration
+
+- Phase 3a: Direct clipboard export as flattened raster PNG
+- Phase 3b: Investigate editable vector clipboard payloads
+
+### 3.4 Contextual Menus (Right-Click)
+
+- Custom canvas context menu with quick actions:
+  - Apply suggested effects, duplicate layer, quick export, group selection
+
+### 3.5 Grouping ("Frames")
+
+- Group image + text layers into a single "Frame" rigid body
+- Shared physics behavior and shared effect boundary
+
+---
+
+## Phase 4 — UX Polish & Persistence
+
+_Goal: make the tool reliable, immersive, and enjoyable for long sessions._
+
+### 4.1 Local Persistence (IndexedDB)
+
+- Auto-save canvas layout, images, and all effect parameters to the browser
+- Survive page refresh and browser crashes without losing work
+
+### 4.2 Sound Design
+
+- Tactile UI sounds (`howler.js` or Web Audio API)
+- Triggers: first image import, element drop, heavy effect toggle, export complete
+
+### 4.3 First-Time User Experience (FTUE)
+
+- Lightweight, beautiful onboarding animation on first launch
+- Introduces the physics + dithering concept interactively
+
+---
+
+## Phase 5 — Cloud & Community (Long-Term)
+
+_Goal: transform Ditter.io from a local studio into a platform._
+
+### 5.1 Accounts & Freemium Model
+
+- Core features (prototyping, local save, basic export) remain **free and login-free forever**
+- Premium tier via Supabase / Firebase:
+  - Cloud workspace sync across devices
+  - Server-side video rendering (for long or HD exports)
+  - Early access to experimental effects
 
 ---
