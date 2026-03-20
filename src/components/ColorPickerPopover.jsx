@@ -61,6 +61,7 @@ const ColorPickerPopover = ({ color = '#ffffff', onChange, onClose, initialPosit
   useEffect(() => {
     const activeVal = color === 'transparent' ? '#ffffff00' : color;
     if (activeVal !== localColor) setLocalColor(activeVal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color]);
 
   const handleColorChange = (newColor) => {

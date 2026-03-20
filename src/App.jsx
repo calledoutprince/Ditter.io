@@ -38,6 +38,7 @@ const createLayer = (originalUrl, name) => ({
   contrast: 40,           // 0–100 % → maps to 0.1–3.0 raw
   colors: { shadow: '#111111', midtone: '#888888', highlight: '#ffffff' },
   hiddenColors: [],       // array of types e.g. ['shadow']
+  pre: { blur: 0 },       // pre-processing params
 });
 
 // Normalise percentage to algorithm range
@@ -65,6 +66,7 @@ function App() {
   }, [selectedLayer, updateLayer]);
 
   // ── Export state ─────────────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -72,8 +74,10 @@ function App() {
   const [exportFormat, setExportFormat] = useState('image');
 
   // ── UI state ─────────────────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [activeColorPopover, setActiveColorPopover] = useState(null);
+  const [preProcessOpen, setPreProcessOpen] = useState(false);
   // ── Asset tab state ─────────────────────────────────────────────────────
   const [assetTab, setAssetTab] = useState('image');
 
@@ -285,6 +289,7 @@ function App() {
   };
 
   // ── Export ───────────────────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const activeUrl = selectedLayer?.processedUrl ?? null;
   // colors will be used when SVG/Figma/Framer export is re-enabled
   // const colors = selectedLayer?.colors;
@@ -394,11 +399,13 @@ function App() {
 
   const handleCopyToClipboard = async () => {
     if (!selectedLayer) return;
-    const canvas = document.querySelector('canvas');
-    if (!canvas) return;
+    const sourceUrl = selectedLayer.processedUrl || selectedLayer.originalUrl;
+    if (!sourceUrl) return;
 
     try {
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      // Fetch the data URL as a Blob — avoids Chrome canvas taint SecurityError
+      const response = await fetch(sourceUrl);
+      const blob = await response.blob();
       const data = [new ClipboardItem({ 'image/png': blob })];
       await navigator.clipboard.write(data);
       setCopySuccess(true);
@@ -424,27 +431,19 @@ function App() {
       />
 
       {/* EffectEngine per layer — only runs when effect is armed */}
-      {layers.map(layer => {
-        if (!layer.effectEnabled) return null;
-
-        // Filter out hidden colors
-        const activeColors = { ...layer.colors };
-        if (layer.hiddenColors) {
-          layer.hiddenColors.forEach(hc => { delete activeColors[hc]; });
-        }
-
-        return (
-          <EffectEngine
-            key={layer.id}
-            src={layer.originalUrl}
-            effectType={layer.effectType}
-            pixelScale={rawPixelScale(layer.pixelScale)}
-            contrast={rawContrast(layer.contrast)}
-            colors={activeColors}
-            onProcessed={(url) => updateLayer(layer.id, { processedUrl: url })}
-          />
-        );
-      })}
+      {layers.map(layer => layer.effectEnabled ? (
+        <EffectEngine
+          key={layer.id}
+          src={layer.originalUrl}
+          effectType={layer.effectType}
+          pixelScale={rawPixelScale(layer.pixelScale)}
+          contrast={rawContrast(layer.contrast)}
+          accentColor={layer.accentColor}
+          colors={layer.colors}
+          pre={layer.pre}
+          onProcessed={(url) => updateLayer(layer.id, { processedUrl: url })}
+        />
+      ) : null)}
 
       {/* ── Canvas ─────────────────────────────────────────────────────── */}
       <main
@@ -672,6 +671,57 @@ function App() {
               </div>
 
               <div className="panel-divider" />
+
+              {/* Pre-Process Pipeline */}
+              {selectedLayer?.effectEnabled && (
+                <>
+                  <div className="panel-section">
+                    <div
+                      className="section-header"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setPreProcessOpen(v => !v)}
+                    >
+                      <label className="control-label" style={{ cursor: 'pointer' }}>Pre-Process</label>
+                      <motion.div
+                        animate={{ rotate: preProcessOpen ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ color: 'var(--text-dim)', transformOrigin: 'center' }}
+                      >
+                        <ChevronDown size={14} />
+                      </motion.div>
+                    </div>
+
+                    <AnimatePresence initial={false}>
+                      {preProcessOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Pre-Blur Slider */}
+                            <div className="control-group">
+                              <label className="control-label" style={{ fontSize: 10 }}>Blur</label>
+                              <div className="slider-row">
+                                <input
+                                  type="range" min="0" max="20" step="1"
+                                  value={selectedLayer.pre.blur}
+                                  style={{ '--val': `${(selectedLayer.pre.blur / 20) * 100}%` }}
+                                  onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, blur: Number(e.target.value) } })}
+                                />
+                                <span className="pct-badge">{selectedLayer.pre.blur}px</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  <div className="panel-divider" />
+                </>
+              )}
 
               {/* Pixel Scale + Contrast */}
               <div className="panel-section">
@@ -1012,22 +1062,24 @@ function App() {
         )}
       </AnimatePresence>
       {/* Portalled Color Picker to ensure it draws outside the sidebar completely */}
-      {activeColorPopover && createPortal(
-        <div style={{ position: 'fixed', top: activeColorPopover.top - 20, left: activeColorPopover.left, zIndex: 10000 }}>
-          <ColorPickerPopover
-            color={selectedLayer?.colors?.[activeColorPopover.type] || '#ffffff'}
-            initialPosition={{ top: activeColorPopover.top - 20, left: activeColorPopover.left }}
-            onPositionChange={(pos) => setActiveColorPopover(prev => ({ ...prev, ...pos }))}
-            onChange={(newColor) => {
-              if (selectedLayerId) {
-                setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, colors: { ...l.colors, [activeColorPopover.type]: newColor } } : l));
-              }
-            }}
-            onClose={() => setActiveColorPopover(null)}
-          />
-        </div>,
-        document.body
-      )}
+      {
+        activeColorPopover && createPortal(
+          <div style={{ position: 'fixed', top: activeColorPopover.top - 20, left: activeColorPopover.left, zIndex: 10000 }}>
+            <ColorPickerPopover
+              color={selectedLayer?.colors?.[activeColorPopover.type] || '#ffffff'}
+              initialPosition={{ top: activeColorPopover.top - 20, left: activeColorPopover.left }}
+              onPositionChange={(pos) => setActiveColorPopover(prev => ({ ...prev, ...pos }))}
+              onChange={(newColor) => {
+                if (selectedLayerId) {
+                  setLayers(prev => prev.map(l => l.id === selectedLayerId ? { ...l, colors: { ...l.colors, [activeColorPopover.type]: newColor } } : l));
+                }
+              }}
+              onClose={() => setActiveColorPopover(null)}
+            />
+          </div>,
+          document.body
+        )
+      }
 
     </div>
   );
