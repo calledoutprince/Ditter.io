@@ -38,7 +38,7 @@ const createLayer = (originalUrl, name) => ({
   contrast: 40,           // 0–100 % → maps to 0.1–3.0 raw
   colors: { shadow: '#111111', midtone: '#888888', highlight: '#ffffff' },
   hiddenColors: [],       // array of types e.g. ['shadow']
-  pre: { blur: 0 },       // pre-processing params
+  pre: { blur: 0, brightness: 0 },       // pre-processing params
 });
 
 // Normalise percentage to algorithm range
@@ -712,6 +712,22 @@ function App() {
                                   onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, blur: Number(e.target.value) } })}
                                 />
                                 <span className="pct-badge">{selectedLayer.pre.blur}px</span>
+                              </div>
+                            </div>
+
+                            {/* Pre-Brightness Slider */}
+                            <div className="control-group">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 4 }}>
+                                <label className="control-label" style={{ fontSize: 10, margin: 0 }}>Brightness</label>
+                                <span className="pct-badge">{selectedLayer.pre.brightness > 0 ? '+' : ''}{selectedLayer.pre.brightness}</span>
+                              </div>
+                              <div className="slider-row">
+                                <input
+                                  type="range" min="-100" max="100" step="1"
+                                  value={selectedLayer.pre.brightness}
+                                  style={{ '--val': `${((selectedLayer.pre.brightness + 100) / 200) * 100}%` }}
+                                  onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, brightness: Number(e.target.value) } })}
+                                />
                               </div>
                             </div>
                           </div>

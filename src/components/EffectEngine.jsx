@@ -94,8 +94,14 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
             tempCanvas.width = scaledWidth;
             tempCanvas.height = scaledHeight;
             const tctx = tempCanvas.getContext('2d', { willReadFrequently: true });
-            if (pre?.blur > 0) {
-                tctx.filter = `blur(${pre.blur}px)`;
+            let filterString = '';
+            if (pre?.blur > 0) filterString += `blur(${pre.blur}px) `;
+            if (pre?.brightness !== undefined && pre.brightness !== 0) {
+                // Map -100 => 0%, 0 => 100%, +100 => 200%
+                filterString += `brightness(${100 + pre.brightness}%) `;
+            }
+            if (filterString.trim() !== '') {
+                tctx.filter = filterString.trim();
             }
             tctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
             tctx.filter = 'none'; // reset filter so it doesn't leak
@@ -121,7 +127,7 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur]);
+    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur, pre?.brightness]);
 
     return (
         <canvas
