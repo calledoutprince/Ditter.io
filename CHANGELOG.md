@@ -7,23 +7,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
-## [0.4.0] - 2026-03-20
-
-### Added
-
-- Pre-Processing Pipeline: Pre-Blur slider (allows blurring image input before the dithering pass to soften gradients).
-- Expandable `Pre-Process` UI section in the layers panel.
-
----
-
-## [0.3.1] - 2026-03-02
-
-### Fixed
-
-- Export fix
-
----
-
 ## [0.3.0] - 2026-03-02
 
 ### Added

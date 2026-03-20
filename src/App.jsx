@@ -8,9 +8,13 @@ import PhysicsElement from './components/PhysicsElement';
 import EffectEngine from './components/EffectEngine';
 import { extractDominantColors } from './utils/colors';
 import ColorPickerPopover from './components/ColorPickerPopover';
-import { vectorizeToSVG, downloadSVG } from './utils/vectorizer';
-// eslint-disable-next-line no-unused-vars
-import { copyHTMLToClipboard, constructFigmaPayload } from './utils/integrations';
+import {
+  applyAtkinsonDither,
+  applyHalftoneDither,
+  applyColorMap,
+  generateSVG
+} from './utils/dither';
+import { applyAsciiEffect } from './components/EffectEngine';
 import Dropdown from './components/Dropdown';
 import LayerItem from './components/LayerItem';
 import './index.css';
@@ -292,50 +296,98 @@ function App() {
 
   const handleExport = async () => {
     if (!selectedLayer) return;
-    // Use the pre-rendered data URL stored by EffectEngine.
-    // This avoids Chrome's canvas taint SecurityError from document.querySelector('canvas').
-    const sourceUrl = selectedLayer.processedUrl || selectedLayer.originalUrl;
-    if (!sourceUrl) return;
 
-    const filename = selectedLayer.name.toLowerCase().replace(/\s+/g, '-');
+    // Load image
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = selectedLayer.originalUrl;
+
+    await new Promise(resolve => { img.onload = resolve; });
+
+    const { effectType, pixelScale, contrast, colors, hiddenColors, name } = selectedLayer;
+    const activeColors = { ...colors };
+    if (hiddenColors) {
+      hiddenColors.forEach(hc => { delete activeColors[hc]; });
+    }
+
+    const scale = parseInt(exportScale.replace('x', ''));
+    const isAscii = effectType === 'ascii';
+
+    // Base dimensions (original image / pixelScale)
+    const baseW = Math.floor(img.width / rawPixelScale(pixelScale));
+    const baseH = Math.floor(img.height / rawPixelScale(pixelScale));
+
+    // Output dimensions (scaled)
+    const outW = baseW * scale;
+    const outH = baseH * scale;
+
+    const exportCanvas = document.createElement('canvas');
+    if (isAscii) {
+      // ASCII needs a larger canvas for the characters
+      const charScale = 8;
+      exportCanvas.width = baseW * charScale * scale;
+      exportCanvas.height = baseH * charScale * scale;
+    } else {
+      exportCanvas.width = outW;
+      exportCanvas.height = outH;
+    }
+
+    const ctx = exportCanvas.getContext('2d');
+
+    // Create processing canvas at base resolution
+    const procCanvas = document.createElement('canvas');
+    procCanvas.width = baseW;
+    procCanvas.height = baseH;
+    const pctx = procCanvas.getContext('2d');
+    pctx.drawImage(img, 0, 0, baseW, baseH);
+
+    let imageData = pctx.getImageData(0, 0, baseW, baseH);
+    const isTriColor = activeColors.midtone !== undefined && activeColors.midtone !== null && activeColors.midtone !== '';
+
+    if (effectType === 'atkinson') {
+      const threshold = 128 * (1 / rawContrast(contrast));
+      applyAtkinsonDither(imageData, threshold, isTriColor);
+      applyColorMap(imageData, activeColors);
+    } else if (effectType === 'halftone') {
+      applyHalftoneDither(imageData, rawContrast(contrast), isTriColor);
+      applyColorMap(imageData, activeColors);
+    }
 
     try {
-      if (exportFormat === 'image' || exportFormat === 'webp') {
-        // Convert dataURL -> Blob via fetch (works in all browsers, avoids taint)
-        const response = await fetch(sourceUrl);
-        let blob = await response.blob();
-        let extension = 'png';
-
-        if (exportFormat === 'webp') {
-          // Re-draw onto offscreen canvas to convert PNG data URL -> WebP
-          const img = await new Promise((res, rej) => {
-            const i = new Image();
-            i.onload = () => res(i);
-            i.onerror = rej;
-            i.src = sourceUrl;
-          });
-          const off = document.createElement('canvas');
-          off.width = img.width;
-          off.height = img.height;
-          off.getContext('2d').drawImage(img, 0, 0);
-          blob = await new Promise(resolve => off.toBlob(resolve, 'image/webp'));
-          extension = 'webp';
-        }
-
+      if (exportFormat === 'vector') {
+        // Generate SVG from the processed pixels
+        const svgString = generateSVG(imageData, scale, activeColors);
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `ditter-${filename}.${extension}`;
-        document.body.appendChild(link);
+        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.svg`;
         link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        triggerCanvasFlash();
-      } else if (exportFormat === 'vector') {
-        const bgHex = selectedLayer.colors.shadow || '#000000';
-        const { svgString } = await vectorizeToSVG(sourceUrl, bgHex);
-        downloadSVG(svgString, `ditter-${filename}.svg`);
-        triggerCanvasFlash();
+      } else if (isAscii) {
+        // ASCII Render to export canvas
+        applyAsciiEffect(imageData, ctx, baseW, baseH, exportCanvas.width, exportCanvas.height, rawContrast(contrast), activeColors);
+        const blob = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.png`;
+        link.click();
+      } else {
+        // Normal Image Export (upscaled pixels)
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = baseW;
+        tempCanvas.height = baseH;
+        tempCanvas.getContext('2d').putImageData(imageData, 0, 0);
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tempCanvas, 0, 0, outW, outH);
+
+        const blob = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ditter-${name.toLowerCase().replace(/\s+/g, '-')}.png`;
+        link.click();
       }
 
       setExportSuccess(true);
@@ -891,10 +943,12 @@ function App() {
                     <Dropdown
                       options={[
                         { label: 'PNG', value: 'image' },
-                        { label: 'WebP', value: 'webp' },
-                        { label: 'Vector (SVG)', value: 'vector' },
-                        { label: 'Figma', value: 'figma', disabled: true, tag: 'WIP' },
-                        { label: 'PDF', value: 'pdf', disabled: true, tag: 'Soon' },
+                        { label: 'Vector', value: 'vector', tag: 'Fast' },
+                        { label: 'WebP', value: 'webp', disabled: true },
+                        { label: 'SVG', value: 'svg_path', disabled: true, tag: 'Paths' },
+                        { label: 'Figma', value: 'figma', disabled: true, tag: 'BETA' },
+                        { label: 'Framer', value: 'framer', disabled: true },
+                        { label: 'PDF', value: 'pdf', disabled: true }
                       ]}
                       value={exportFormat}
                       onChange={setExportFormat}
