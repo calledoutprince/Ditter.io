@@ -38,7 +38,7 @@ const createLayer = (originalUrl, name) => ({
   contrast: 40,           // 0–100 % → maps to 0.1–3.0 raw
   colors: { shadow: '#111111', midtone: '#888888', highlight: '#ffffff' },
   hiddenColors: [],       // array of types e.g. ['shadow']
-  pre: { blur: 0, brightness: 0 },       // pre-processing params
+  pre: { blur: 0, brightness: 0, contrast: 0 },       // pre-processing params
 });
 
 // Normalise percentage to algorithm range
@@ -727,6 +727,22 @@ function App() {
                                   value={selectedLayer.pre.brightness}
                                   style={{ '--val': `${((selectedLayer.pre.brightness + 100) / 200) * 100}%` }}
                                   onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, brightness: Number(e.target.value) } })}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Pre-Contrast Slider */}
+                            <div className="control-group">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: 4 }}>
+                                <label className="control-label" style={{ fontSize: 10, margin: 0 }}>Contrast</label>
+                                <span className="pct-badge">{selectedLayer.pre.contrast > 0 ? '+' : ''}{selectedLayer.pre.contrast}</span>
+                              </div>
+                              <div className="slider-row">
+                                <input
+                                  type="range" min="-100" max="100" step="1"
+                                  value={selectedLayer.pre.contrast}
+                                  style={{ '--val': `${((selectedLayer.pre.contrast + 100) / 200) * 100}%` }}
+                                  onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, contrast: Number(e.target.value) } })}
                                 />
                               </div>
                             </div>

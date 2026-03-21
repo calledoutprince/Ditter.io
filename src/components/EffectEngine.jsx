@@ -100,6 +100,10 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
                 // Map -100 => 0%, 0 => 100%, +100 => 200%
                 filterString += `brightness(${100 + pre.brightness}%) `;
             }
+            if (pre?.contrast !== undefined && pre.contrast !== 0) {
+                // Map -100 => 0%, 0 => 100%, +100 => 200%
+                filterString += `contrast(${100 + pre.contrast}%) `;
+            }
             if (filterString.trim() !== '') {
                 tctx.filter = filterString.trim();
             }
@@ -127,7 +131,7 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur, pre?.brightness]);
+    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur, pre?.brightness, pre?.contrast]);
 
     return (
         <canvas
