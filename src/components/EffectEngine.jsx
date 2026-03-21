@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
     applyAtkinsonDither,
     applyHalftoneDither,
-    applyAsciiDither,
     applyColorMap
 } from '../utils/dither';
 
 // Move the ASCII logic here for now as it needs the canvas context directly
+// eslint-disable-next-line react-refresh/only-export-components
 export const applyAsciiEffect = (imageData, ctx, sw, sh, ow, oh, contrast, colors) => {
     const data = imageData.data;
     const chars = ['@', '%', '#', '*', '+', '=', '-', ':', '.', ' '].reverse();
@@ -94,8 +94,18 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
             tempCanvas.width = scaledWidth;
             tempCanvas.height = scaledHeight;
             const tctx = tempCanvas.getContext('2d', { willReadFrequently: true });
-            if (pre?.blur > 0) {
-                tctx.filter = `blur(${pre.blur}px)`;
+            let filterString = '';
+            if (pre?.blur > 0) filterString += `blur(${pre.blur}px) `;
+            if (pre?.brightness !== undefined && pre.brightness !== 0) {
+                // Map -100 => 0%, 0 => 100%, +100 => 200%
+                filterString += `brightness(${100 + pre.brightness}%) `;
+            }
+            if (pre?.contrast !== undefined && pre.contrast !== 0) {
+                // Map -100 => 0%, 0 => 100%, +100 => 200%
+                filterString += `contrast(${100 + pre.contrast}%) `;
+            }
+            if (filterString.trim() !== '') {
+                tctx.filter = filterString.trim();
             }
             tctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
             tctx.filter = 'none'; // reset filter so it doesn't leak
@@ -121,7 +131,7 @@ const EffectEngine = ({ src, effectType, pixelScale, contrast, accentColor, colo
 
         };
         img.src = src;
-    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur]);
+    }, [src, effectType, pixelScale, contrast, activeColors, isTriColor, pre?.blur, pre?.brightness, pre?.contrast]);
 
     return (
         <canvas

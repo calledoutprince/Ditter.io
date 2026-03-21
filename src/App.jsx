@@ -38,7 +38,7 @@ const createLayer = (originalUrl, name) => ({
   contrast: 40,           // 0–100 % → maps to 0.1–3.0 raw
   colors: { shadow: '#111111', midtone: '#888888', highlight: '#ffffff' },
   hiddenColors: [],       // array of types e.g. ['shadow']
-  pre: { blur: 0 },       // pre-processing params
+  pre: { blur: 0, brightness: 0, contrast: 0 },       // pre-processing params
 });
 
 // Normalise percentage to algorithm range
@@ -283,6 +283,7 @@ function App() {
   };
 
   // ── Canvas flash helper ──────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const triggerCanvasFlash = () => {
     setCanvasFlash(true);
     setTimeout(() => setCanvasFlash(false), 550);
@@ -622,7 +623,6 @@ function App() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 300, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              style={{ opacity: selectedLayer ? 1 : 0.6, pointerEvents: selectedLayer ? 'all' : 'none' }}
             >
               {/* Effect Render */}
               <div className="panel-section">
@@ -672,81 +672,159 @@ function App() {
 
               <div className="panel-divider" />
 
-              {/* Pre-Process Pipeline */}
-              {selectedLayer?.effectEnabled && (
-                <>
-                  <div className="panel-section">
-                    <div
-                      className="section-header"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setPreProcessOpen(v => !v)}
-                    >
-                      <label className="control-label" style={{ cursor: 'pointer' }}>Pre-Process</label>
-                      <motion.div
-                        animate={{ rotate: preProcessOpen ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ color: 'var(--text-dim)', transformOrigin: 'center' }}
-                      >
-                        <ChevronDown size={14} />
-                      </motion.div>
-                    </div>
-
-                    <AnimatePresence initial={false}>
-                      {preProcessOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          style={{ overflow: 'hidden' }}
-                        >
-                          <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {/* Pre-Blur Slider */}
-                            <div className="control-group">
-                              <label className="control-label" style={{ fontSize: 10 }}>Blur</label>
-                              <div className="slider-row">
-                                <input
-                                  type="range" min="0" max="20" step="1"
-                                  value={selectedLayer.pre.blur}
-                                  style={{ '--val': `${(selectedLayer.pre.blur / 20) * 100}%` }}
-                                  onChange={(e) => updateSelected({ pre: { ...selectedLayer.pre, blur: Number(e.target.value) } })}
-                                />
-                                <span className="pct-badge">{selectedLayer.pre.blur}px</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  <div className="panel-divider" />
-                </>
-              )}
-
-              {/* Pixel Scale + Contrast */}
+              {/* ── IMAGE ADJUST (always visible, disabled when no layer/effect) ── */}
               <div className="panel-section">
+                <div
+                  className="section-header"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setPreProcessOpen(v => !v)}
+                >
+                  <label className="control-label" style={{ cursor: 'pointer' }}>Image Adjust</label>
+                  <motion.div
+                    animate={{ rotate: preProcessOpen ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ color: 'var(--text-dim)', transformOrigin: 'center' }}
+                  >
+                    <ChevronDown size={14} />
+                  </motion.div>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {preProcessOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ overflow: 'hidden' }}
+                    >
+                      <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 12, opacity: selectedLayer ? 1 : 0.4 }}>
+
+                        {/* Blur */}
+                        <div className="control-group">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="control-label" style={{ fontSize: 10, margin: 0 }}>Blur</label>
+                            <input
+                              type="number" min="0" max="20"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.blur ?? 0}
+                              onChange={e => { const v = Math.min(20, Math.max(0, Number(e.target.value))); updateSelected({ pre: { ...selectedLayer.pre, blur: v } }); }}
+                              style={{ width: 40, background: 'none', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: 10, textAlign: 'right', outline: 'none', padding: '1px 2px' }}
+                            />
+                          </div>
+                          <div className="slider-row">
+                            <input
+                              type="range" min="0" max="20" step="1"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.blur ?? 0}
+                              style={{ '--val': `${((selectedLayer?.pre?.blur ?? 0) / 20) * 100}%` }}
+                              onChange={e => updateSelected({ pre: { ...selectedLayer.pre, blur: Number(e.target.value) } })}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Brightness */}
+                        <div className="control-group">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="control-label" style={{ fontSize: 10, margin: 0 }}>Brightness</label>
+                            <input
+                              type="number" min="-100" max="100"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.brightness ?? 0}
+                              onChange={e => { const v = Math.min(100, Math.max(-100, Number(e.target.value))); updateSelected({ pre: { ...selectedLayer.pre, brightness: v } }); }}
+                              style={{ width: 40, background: 'none', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: 10, textAlign: 'right', outline: 'none', padding: '1px 2px' }}
+                            />
+                          </div>
+                          <div className="slider-row">
+                            <input
+                              type="range" min="-100" max="100" step="1"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.brightness ?? 0}
+                              style={{ '--val': `${(((selectedLayer?.pre?.brightness ?? 0) + 100) / 200) * 100}%` }}
+                              onChange={e => updateSelected({ pre: { ...selectedLayer.pre, brightness: Number(e.target.value) } })}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Contrast (pre) */}
+                        <div className="control-group">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="control-label" style={{ fontSize: 10, margin: 0 }}>Contrast</label>
+                            <input
+                              type="number" min="-100" max="100"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.contrast ?? 0}
+                              onChange={e => { const v = Math.min(100, Math.max(-100, Number(e.target.value))); updateSelected({ pre: { ...selectedLayer.pre, contrast: v } }); }}
+                              style={{ width: 40, background: 'none', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: 10, textAlign: 'right', outline: 'none', padding: '1px 2px' }}
+                            />
+                          </div>
+                          <div className="slider-row">
+                            <input
+                              type="range" min="-100" max="100" step="1"
+                              disabled={!selectedLayer}
+                              value={selectedLayer?.pre?.contrast ?? 0}
+                              style={{ '--val': `${(((selectedLayer?.pre?.contrast ?? 0) + 100) / 200) * 100}%` }}
+                              onChange={e => updateSelected({ pre: { ...selectedLayer.pre, contrast: Number(e.target.value) } })}
+                            />
+                          </div>
+                        </div>
+
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="panel-divider" />
+
+              {/* ── PIXEL SCALE + ALGORITHM SENSITIVITY ── */}
+              <div className="panel-section">
+                {/* Pixel Scale */}
                 <div className="control-group">
-                  <label className="control-label">Pixel Scale</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="control-label">Pixel Scale</label>
+                    <input
+                      type="number" min="0" max="100"
+                      disabled={!selectedLayer}
+                      value={selectedLayer?.pixelScale ?? 40}
+                      onChange={e => { const v = Math.min(100, Math.max(0, Number(e.target.value))); updateSelected({ pixelScale: v }); }}
+                      style={{ width: 40, background: 'none', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: 10, textAlign: 'right', outline: 'none', padding: '1px 2px' }}
+                    />
+                  </div>
                   <div className="slider-row">
                     <input
                       type="range" min="0" max="100"
+                      disabled={!selectedLayer}
                       value={selectedLayer?.pixelScale ?? 40}
                       style={{ '--val': `${selectedLayer?.pixelScale ?? 40}%` }}
                       onChange={e => updateSelected({ pixelScale: parseInt(e.target.value) })}
                     />
-                    <span className="slider-pct">{selectedLayer?.pixelScale ?? 40}%</span>
                   </div>
                 </div>
+                {/* Algorithm Sensitivity (was: Contrast) */}
                 <div className="control-group">
-                  <label className="control-label">Contrast</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label
+                      className="control-label"
+                      title="Controls how aggressively the dither algorithm pushes pixels to black or white"
+                      style={{ cursor: 'help' }}
+                    >Algorithm Sensitivity</label>
+                    <input
+                      type="number" min="0" max="100"
+                      disabled={!selectedLayer}
+                      value={selectedLayer?.contrast ?? 40}
+                      onChange={e => { const v = Math.min(100, Math.max(0, Number(e.target.value))); updateSelected({ contrast: v }); }}
+                      style={{ width: 40, background: 'none', border: 'none', borderBottom: '1px solid var(--border-color)', color: 'var(--text-color)', fontSize: 10, textAlign: 'right', outline: 'none', padding: '1px 2px' }}
+                    />
+                  </div>
                   <div className="slider-row">
                     <input
                       type="range" min="0" max="100"
+                      disabled={!selectedLayer}
                       value={selectedLayer?.contrast ?? 40}
                       style={{ '--val': `${selectedLayer?.contrast ?? 40}%` }}
                       onChange={e => updateSelected({ contrast: parseInt(e.target.value) })}
                     />
-                    <span className="slider-pct">{selectedLayer?.contrast ?? 40}%</span>
                   </div>
                 </div>
               </div>
