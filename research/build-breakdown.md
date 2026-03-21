@@ -6,7 +6,7 @@ _Every feature broken into the smallest shippable chunks. Each chunk = one resea
 
 ## Phase 1 (v0.4.x) — Richer Dithering & Visual Depth
 
-### v0.4.0 — Pre-Processing Pipeline
+### Pre-Processing Pipeline
 
 | #     | Chunk                      | What ships                                                                            |
 | ----- | -------------------------- | ------------------------------------------------------------------------------------- |
@@ -17,7 +17,7 @@ _Every feature broken into the smallest shippable chunks. Each chunk = one resea
 | v0.4.0-5   | **Gamma slider**           | `pre.gamma` field + `out = 255 × (in/255)^(1/γ)` pixel loop                           |
 | v0.4.0-6   | **Pre-Process UI section** | Collapsible panel section in right panel with all 5 sliders wired up                  |
 
-### v0.4.1 — Expanded Algorithm Library
+### Expanded Algorithm Library
 
 | #      | Chunk                      | What ships                                                                                |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------------- |
@@ -37,7 +37,7 @@ _Every feature broken into the smallest shippable chunks. Each chunk = one resea
 | v0.4.1-14  | **Bit Depth control**      | Slider 1–8; quantise output to N levels instead of hard 1-bit                             |
 | v0.4.1-15  | **Color Space selector**   | Dropdown: Luma / RGB / CIELAB; changes luminance model used for thresholding              |
 
-### v0.4.2 — Palette Presets & Color Tools
+### Palette Presets & Color Tools
 
 | #     | Chunk                     | What ships                                                                                    |
 | ----- | ------------------------- | --------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ _Every feature broken into the smallest shippable chunks. Each chunk = one resea
 | v0.4.2-4   | **Auto color extraction** | `extractDominantColors(imageUrl, n)` using k-means on image pixels; fills slots on import     |
 | v0.4.2-5   | **"Surprise me" button**  | Picks a random curated palette and applies it to the selected layer                           |
 
-### v0.4.3 — Post-Processing & Blending
+### Post-Processing & Blending
 
 | #     | Chunk                       | What ships                                                                           |
 | ----- | --------------------------- | ------------------------------------------------------------------------------------ |
@@ -56,7 +56,7 @@ _Every feature broken into the smallest shippable chunks. Each chunk = one resea
 | v0.4.3-3   | **Intensity blend slider**  | `post.intensity` field; composites dithered result over original using `globalAlpha` |
 | v0.4.3-4   | **Post-Process UI section** | Collapsible section in right panel with the 3 sliders wired up                       |
 
-### v0.4.4 — Text Layers
+### Text Layers
 
 | #     | Chunk                     | What ships                                                                               |
 | ----- | ------------------------- | ---------------------------------------------------------------------------------------- |
