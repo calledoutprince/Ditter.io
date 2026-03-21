@@ -134,7 +134,7 @@ export const applyColorMap = (imageData, colors) => {
 
 export const generateSVG = (imageData, pixelScale, colors) => {
     const { width, height, data } = imageData;
-    const { shadow, midtone, highlight } = colors;
+    const { shadow: _shadow, midtone: _midtone, highlight } = colors;
 
     let svgContent = `<svg width="${width * pixelScale}" height="${height * pixelScale}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
 

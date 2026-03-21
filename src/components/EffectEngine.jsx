@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
     applyAtkinsonDither,
     applyHalftoneDither,
-    applyAsciiDither,
     applyColorMap
 } from '../utils/dither';
 
 // Move the ASCII logic here for now as it needs the canvas context directly
+// eslint-disable-next-line react-refresh/only-export-components
 export const applyAsciiEffect = (imageData, ctx, sw, sh, ow, oh, contrast, colors) => {
     const data = imageData.data;
     const chars = ['@', '%', '#', '*', '+', '=', '-', ':', '.', ' '].reverse();

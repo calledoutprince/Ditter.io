@@ -283,6 +283,7 @@ function App() {
   };
 
   // ── Canvas flash helper ──────────────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const triggerCanvasFlash = () => {
     setCanvasFlash(true);
     setTimeout(() => setCanvasFlash(false), 550);
