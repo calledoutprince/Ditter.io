@@ -29,14 +29,14 @@ function makeImageData(width, height, fillValue = 128) {
 describe('applyAtkinsonDither', () => {
   it('returns the modified imageData object', () => {
     const imageData = makeImageData(4, 4);
-    const result = applyAtkinsonDither(imageData, 128);
+    const result = applyAtkinsonDither(imageData, 128, false);
     expect(result).toBe(imageData); // same reference — mutated in-place
   });
 
   it('converts all pixels below threshold to black (0)', () => {
     // Fill every pixel with value 10 — well below any threshold
     const imageData = makeImageData(4, 4, 10);
-    applyAtkinsonDither(imageData, 128);
+    applyAtkinsonDither(imageData, 128, false);
     // Check the RGB channels of the first pixel
     expect(imageData.data[0]).toBe(0);
     expect(imageData.data[1]).toBe(0);
@@ -46,7 +46,7 @@ describe('applyAtkinsonDither', () => {
   it('converts all pixels at or above threshold to white (255)', () => {
     // Fill every pixel with 250 — well above the default 128 threshold
     const imageData = makeImageData(4, 4, 250);
-    applyAtkinsonDither(imageData, 128);
+    applyAtkinsonDither(imageData, 128, false);
     // Most pixels should be quantised to 255 (some may get error diffused down)
     // The very first pixel has no error-diffusion neighbours, so it is deterministic
     expect(imageData.data[0]).toBe(255);
@@ -55,7 +55,7 @@ describe('applyAtkinsonDither', () => {
   it('keeps pixel values clamped to [0, 255]', () => {
     // Alternating extremes create maximum error-diffusion pressure
     const imageData = makeImageData(8, 8, 128);
-    applyAtkinsonDither(imageData, 64);
+    applyAtkinsonDither(imageData, 64, false);
     for (let i = 0; i < imageData.data.length; i += 4) {
       expect(imageData.data[i]).toBeGreaterThanOrEqual(0);
       expect(imageData.data[i]).toBeLessThanOrEqual(255);
